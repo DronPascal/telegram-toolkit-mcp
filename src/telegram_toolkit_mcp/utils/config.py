@@ -6,9 +6,17 @@ loading for the MCP server.
 """
 
 import os
-from typing import Optional
 
-from pydantic import BaseModel, Field, ValidationError
+try:
+    from pydantic import BaseModel, Field, ValidationError
+except ImportError:
+    # Fallback for development
+    BaseModel = object
+
+    def Field(**kwargs):
+        return lambda cls: cls
+
+    ValidationError = Exception
 
 
 class TelegramConfig(BaseModel):
@@ -16,7 +24,7 @@ class TelegramConfig(BaseModel):
 
     api_id: int = Field(..., description="Telegram API ID from https://my.telegram.org")
     api_hash: str = Field(..., description="Telegram API Hash from https://my.telegram.org")
-    session_string: Optional[str] = Field(
+    session_string: str | None = Field(
         default=None,
         description="Telethon StringSession (auto-generated if not provided)"
     )
@@ -93,7 +101,7 @@ class ObservabilityConfig(BaseModel):
         default=True,
         description="Enable OpenTelemetry distributed tracing"
     )
-    otlp_endpoint: Optional[str] = Field(
+    otlp_endpoint: str | None = Field(
         default=None,
         description="OTLP endpoint for trace export"
     )
@@ -193,7 +201,7 @@ def validate_telegram_credentials(config: AppConfig) -> bool:
 
 
 # Global configuration instance
-_config: Optional[AppConfig] = None
+_config: AppConfig | None = None
 
 
 def get_config() -> AppConfig:

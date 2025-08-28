@@ -10,7 +10,7 @@ import json
 import logging
 import re
 import sys
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .config import get_config
 
@@ -131,7 +131,7 @@ class StructuredLogger:
         level: str,
         message: str,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create structured log entry.
 
@@ -154,9 +154,7 @@ class StructuredLogger:
 
         # Add structured data
         for key, value in kwargs.items():
-            if key == "chat_id" and value:
-                entry["chat_hash"] = self.masker.hash_identifier(str(value), "chat")
-            elif key == "chat" and value:
+            if key == "chat_id" and value or key == "chat" and value:
                 entry["chat_hash"] = self.masker.hash_identifier(str(value), "chat")
             elif key == "trace_id" and value:
                 entry["trace_id"] = value
@@ -172,12 +170,11 @@ class StructuredLogger:
                 entry["fetched"] = value
             elif key == "flood_wait_seconds" and isinstance(value, (int, float)):
                 entry["flood_wait_seconds"] = value
-            else:
-                # For unknown fields, mask and include if safe
-                if isinstance(value, str):
-                    entry[key] = self.masker.mask_text(value)
-                elif isinstance(value, (int, float, bool)):
-                    entry[key] = value
+            # For unknown fields, mask and include if safe
+            elif isinstance(value, str):
+                entry[key] = self.masker.mask_text(value)
+            elif isinstance(value, (int, float, bool)):
+                entry[key] = value
 
         return entry
 
@@ -209,12 +206,12 @@ class StructuredLogger:
     def log_tool_call(
         self,
         tool: str,
-        chat: Optional[str] = None,
+        chat: str | None = None,
         status: str = "unknown",
-        duration: Optional[float] = None,
-        fetched: Optional[int] = None,
-        error: Optional[str] = None,
-        trace_id: Optional[str] = None,
+        duration: float | None = None,
+        fetched: int | None = None,
+        error: str | None = None,
+        trace_id: str | None = None,
         **kwargs
     ) -> None:
         """
@@ -248,10 +245,10 @@ class StructuredLogger:
     def log_telegram_api_call(
         self,
         method: str,
-        chat: Optional[str] = None,
+        chat: str | None = None,
         success: bool = True,
-        duration: Optional[float] = None,
-        flood_wait: Optional[float] = None,
+        duration: float | None = None,
+        flood_wait: float | None = None,
         **kwargs
     ) -> None:
         """
@@ -282,7 +279,7 @@ class StructuredLogger:
 
 
 # Global logger instance
-_default_logger: Optional[StructuredLogger] = None
+_default_logger: StructuredLogger | None = None
 
 
 def get_logger(name: str = "telegram_toolkit_mcp") -> StructuredLogger:

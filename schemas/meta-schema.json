@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-toolkit-mcp.dev/schemas/meta-schema.json",
+  "$ref": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JSON Schema Meta-Schema for MCP",
+  "description": "Meta-schema for validating JSON Schema documents in Telegram Toolkit MCP",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "enum": ["https://json-schema.org/draft/2020-12/schema"]
+    }
+  }
+}

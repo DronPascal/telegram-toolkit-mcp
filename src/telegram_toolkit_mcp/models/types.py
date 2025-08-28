@@ -6,9 +6,17 @@ Telegram API responses, and internal data structures.
 """
 
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+try:
+    from pydantic import BaseModel, ConfigDict, Field
+except ImportError:
+    # Fallback for development
+    BaseModel = object
+
+    def Field(**kwargs):
+        return lambda cls: cls
+
+    ConfigDict = dict
 
 
 class PeerInfo(BaseModel):
@@ -16,7 +24,7 @@ class PeerInfo(BaseModel):
 
     peer_id: str = Field(..., description="Telegram peer identifier")
     kind: str = Field(..., description="Peer type: user/bot/channel")
-    display: Optional[str] = Field(None, description="Display name if available")
+    display: str | None = Field(None, description="Display name if available")
 
     model_config = ConfigDict(frozen=True)
 
@@ -29,9 +37,9 @@ class AttachmentInfo(BaseModel):
         description="Attachment type",
         examples=["photo", "video", "document", "audio", "voice", "sticker", "link", "poll"]
     )
-    mime: Optional[str] = Field(None, description="MIME type for media files")
-    size: Optional[int] = Field(None, ge=0, description="File size in bytes")
-    uri: Optional[str] = Field(None, description="Resource URI or download link")
+    mime: str | None = Field(None, description="MIME type for media files")
+    size: int | None = Field(None, ge=0, description="File size in bytes")
+    uri: str | None = Field(None, description="Resource URI or download link")
 
     model_config = ConfigDict(frozen=True)
 
@@ -45,19 +53,19 @@ class MessageInfo(BaseModel):
     text: str = Field("", description="Message text content")
 
     # Optional metadata
-    reply_to_id: Optional[int] = Field(None, ge=1, description="Reply-to message ID")
-    topic_id: Optional[int] = Field(None, ge=1, description="Forum topic ID")
-    grouped_id: Optional[int] = Field(None, ge=1, description="Media group ID")
+    reply_to_id: int | None = Field(None, ge=1, description="Reply-to message ID")
+    topic_id: int | None = Field(None, ge=1, description="Forum topic ID")
+    grouped_id: int | None = Field(None, ge=1, description="Media group ID")
 
     # Engagement metrics
-    edit_date: Optional[datetime] = Field(None, description="Last edit timestamp")
-    views: Optional[int] = Field(None, ge=0, description="View count")
-    forwards: Optional[int] = Field(None, ge=0, description="Forward count")
-    replies: Optional[int] = Field(None, ge=0, description="Reply count")
-    reactions: Optional[int] = Field(None, ge=0, description="Reaction count")
+    edit_date: datetime | None = Field(None, description="Last edit timestamp")
+    views: int | None = Field(None, ge=0, description="View count")
+    forwards: int | None = Field(None, ge=0, description="Forward count")
+    replies: int | None = Field(None, ge=0, description="Reply count")
+    reactions: int | None = Field(None, ge=0, description="Reaction count")
 
     # Attachments
-    attachments: List[AttachmentInfo] = Field(
+    attachments: list[AttachmentInfo] = Field(
         default_factory=list,
         description="Message attachments"
     )
@@ -105,7 +113,7 @@ class ChatInfo(BaseModel):
         examples=["channel", "supergroup", "group"]
     )
     title: str = Field(..., description="Chat title/name")
-    member_count: Optional[int] = Field(None, ge=0, description="Member count")
+    member_count: int | None = Field(None, ge=0, description="Member count")
 
     model_config = ConfigDict(frozen=True)
 
@@ -126,7 +134,7 @@ class ErrorInfo(BaseModel):
         ]
     )
     message: str = Field(..., description="Human-readable error message")
-    retry_after: Optional[int] = Field(None, ge=0, description="Seconds to wait before retry")
-    details: Optional[dict] = Field(None, description="Additional error details")
+    retry_after: int | None = Field(None, ge=0, description="Seconds to wait before retry")
+    details: dict | None = Field(None, description="Additional error details")
 
     model_config = ConfigDict(frozen=True)
