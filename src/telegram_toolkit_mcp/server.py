@@ -188,9 +188,11 @@ class TelegramMCPServer:
         try:
             # Import and register tools
             from .tools.resolve_chat import resolve_chat_tool
+            from .tools.fetch_history import fetch_history_tool
 
-            # Register resolve_chat tool
+            # Register tools
             self.mcp_server.add_tool(resolve_chat_tool)
+            self.mcp_server.add_tool(fetch_history_tool)
 
             logger.info("Successfully registered MCP tools")
 
