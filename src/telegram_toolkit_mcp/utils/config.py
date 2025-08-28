@@ -125,6 +125,13 @@ def load_config() -> AppConfig:
         ValidationError: If configuration is invalid
     """
     try:
+        # Load environment variables from .env file
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            # dotenv not available, rely on system environment
+            pass
         # Load Telegram configuration
         telegram_config = TelegramConfig(
             api_id=int(os.getenv("TELEGRAM_API_ID", "0")),
