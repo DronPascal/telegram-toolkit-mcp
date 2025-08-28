@@ -25,7 +25,9 @@ from ..core.error_handler import (
     ValidationException,
     error_handler,
     create_success_response,
-    get_error_tracker
+    get_error_tracker,
+    retry_on_failure,
+    FloodWaitException
 )
 from ..core.pagination import Paginator, PaginationCursor, decode_cursor
 from ..core.filtering import get_message_processor, DateRangeFilter
@@ -294,9 +296,32 @@ async def fetch_history_tool(
                 if 'offset_date' not in pagination_params:
                     pagination_params['offset_date'] = from_dt
 
-        # Fetch messages
-        with client_wrapper.session_context() as client:
-            messages = await client.fetch_messages(chat, **pagination_params)
+        # Fetch messages with automatic FLOOD_WAIT handling
+        try:
+            with client_wrapper.session_context() as client:
+                messages = await client.fetch_messages(chat, **pagination_params)
+        except FloodWaitException as e:
+            logger.warning(
+                "FLOOD_WAIT encountered during message fetch",
+                chat=chat,
+                retry_after=e.retry_after,
+                error=str(e)
+            )
+            get_error_tracker().track_error(e, {
+                "tool": "tg.fetch_history",
+                "chat": chat,
+                "operation": "fetch_messages"
+            })
+            return {
+                "isError": True,
+                "error": e.to_dict(),
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Rate limit exceeded. Please wait {e.retry_after} seconds before retrying."
+                    }
+                ]
+            }
 
         # Apply server-side filtering and processing
         processor = get_message_processor()
@@ -431,6 +456,20 @@ async def fetch_history_tool(
                 {
                     "type": "text",
                     "text": f"Channel is private: {e.message}"
+                }
+            ]
+        }
+
+    except FloodWaitException as e:
+        logger.warning("FLOOD_WAIT in fetch_history", chat=chat, retry_after=e.retry_after)
+        get_error_tracker().track_error(e, {"tool": "tg.fetch_history", "chat": chat})
+        return {
+            "isError": True,
+            "error": e.to_dict(),
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Rate limit exceeded: {e.message}"
                 }
             ]
         }

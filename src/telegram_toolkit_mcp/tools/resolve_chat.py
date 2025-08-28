@@ -23,8 +23,10 @@ from ..core.error_handler import (
     ChatNotFoundException,
     ChannelPrivateException,
     ValidationException,
+    FloodWaitException,
     error_handler,
-    create_success_response
+    create_success_response,
+    get_error_tracker
 )
 from ..models.types import ResolveChatResponse
 from ..utils.logging import get_logger
@@ -193,9 +195,32 @@ async def resolve_chat_tool(
         # Wrap client for high-level operations
         client_wrapper = TelegramClientWrapper(telegram_client)
 
-        # Get chat information
-        with client_wrapper.session_context() as client:
-            chat_info = await client.get_chat_info(parsed['canonical'])
+        # Get chat information with FLOOD_WAIT handling
+        try:
+            with client_wrapper.session_context() as client:
+                chat_info = await client.get_chat_info(parsed['canonical'])
+        except FloodWaitException as e:
+            logger.warning(
+                "FLOOD_WAIT encountered during chat resolution",
+                input=input,
+                retry_after=e.retry_after,
+                error=str(e)
+            )
+            get_error_tracker().track_error(e, {
+                "tool": "tg.resolve_chat",
+                "input": input,
+                "operation": "get_chat_info"
+            })
+            return {
+                "isError": True,
+                "error": e.to_dict(),
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Rate limit exceeded. Please wait {e.retry_after} seconds before retrying."
+                    }
+                ]
+            }
 
         # Prepare response
         response_data = {
@@ -258,6 +283,7 @@ async def resolve_chat_tool(
 
     except ChannelPrivateException as e:
         logger.warning("Channel is private", chat=input, error=e.message)
+        get_error_tracker().track_error(e, {"tool": "tg.resolve_chat", "input": input})
         return {
             "isError": True,
             "error": e.to_dict(),
@@ -265,6 +291,20 @@ async def resolve_chat_tool(
                 {
                     "type": "text",
                     "text": f"Channel is private: {e.message}"
+                }
+            ]
+        }
+
+    except FloodWaitException as e:
+        logger.warning("FLOOD_WAIT in resolve_chat", input=input, retry_after=e.retry_after)
+        get_error_tracker().track_error(e, {"tool": "tg.resolve_chat", "input": input})
+        return {
+            "isError": True,
+            "error": e.to_dict(),
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Rate limit exceeded: {e.message}"
                 }
             ]
         }

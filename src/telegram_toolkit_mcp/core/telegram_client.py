@@ -9,6 +9,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from ..core.error_handler import retry_on_failure, FloodWaitException
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -83,6 +84,7 @@ class TelegramClientWrapper:
             except Exception as e:
                 logger.error("Error during disconnect", error=str(e))
 
+    @retry_on_failure(max_attempts=3, initial_delay=0.5, backoff_factor=1.5)
     async def get_chat_info(self, chat_identifier: str) -> dict[str, Any]:
         """
         Get information about a chat/channel.
@@ -164,6 +166,7 @@ class TelegramClientWrapper:
         else:
             return "unknown"
 
+    @retry_on_failure(max_attempts=3, initial_delay=1.0, backoff_factor=2.0)
     async def fetch_messages(
         self,
         chat_id: str | int,
