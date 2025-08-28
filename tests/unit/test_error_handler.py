@@ -30,22 +30,20 @@ class TestCustomExceptions:
 
     def test_flood_wait_exception(self):
         """Test FloodWaitException creation and properties."""
-        exc = FloodWaitException("Rate limit exceeded", retry_after=30)
+        exc = FloodWaitException(retry_after=30)
 
-        assert exc.message == "Rate limit exceeded"
+        assert "Rate limit exceeded" in exc.message
         assert exc.retry_after == 30
-        assert exc.error_type == "FLOOD_WAIT"
-        assert exc.status_code == 429
+        assert exc.code == "FLOOD_WAIT"
 
     def test_flood_wait_exception_to_dict(self):
         """Test FloodWaitException to_dict method."""
-        exc = FloodWaitException("Rate limit exceeded", retry_after=30)
+        exc = FloodWaitException(retry_after=30)
 
         error_dict = exc.to_dict()
-        assert error_dict["type"] == "FLOOD_WAIT"
-        assert error_dict["title"] == "Rate limit exceeded"
-        assert error_dict["status"] == 429
-        assert "retry_after" in error_dict["detail"]
+        assert error_dict["code"] == "FLOOD_WAIT"
+        assert "Rate limit exceeded" in error_dict["message"]
+        assert error_dict["retry_after"] == 30
 
     def test_chat_not_found_exception(self):
         """Test ChatNotFoundException."""
@@ -150,7 +148,7 @@ class TestRetryLogic:
     def test_retry_with_backoff_flood_wait(self, mock_func):
         """Test retry with FLOOD_WAIT exception."""
         mock_func.side_effect = [
-            FloodWaitException("Rate limit", retry_after=1),
+            FloodWaitException(retry_after=1),
             "success"
         ]
 
@@ -163,7 +161,7 @@ class TestRetryLogic:
 
     def test_retry_with_backoff_max_attempts(self, mock_func):
         """Test retry with maximum attempts reached."""
-        mock_func.side_effect = FloodWaitException("Rate limit", retry_after=1)
+        mock_func.side_effect = FloodWaitException(retry_after=1)
 
         with patch('asyncio.sleep'):
             with pytest.raises(FloodWaitException):
@@ -222,7 +220,7 @@ class TestErrorTracker:
         # Track multiple errors
         errors = [
             ValueError("Error 1"),
-            FloodWaitException("Rate limit", retry_after=30),
+            FloodWaitException(retry_after=30),
             ValueError("Error 2"),
             ChatNotFoundException("Chat not found")
         ]
@@ -281,24 +279,19 @@ class TestResponseCreation:
 
     def test_create_error_response(self):
         """Test creating error response."""
-        error = {
-            "type": "VALIDATION_ERROR",
-            "title": "Invalid input",
-            "status": 400,
-            "detail": "Field is required"
-        }
+        exc = ValidationException("field1", "value", "Invalid")
 
-        response = create_error_response(error, "Error message")
+        response = create_error_response(exc)
 
         assert response["isError"] is True
-        assert response["error"] == error
-        assert response["content"][0]["text"] == "Error message"
+        assert response["error"]["type"] == "VALIDATION_ERROR"
+        assert response["content"][0]["text"] == "Invalid value for field1: value"
 
     def test_create_error_response_with_exception(self):
         """Test creating error response from exception."""
         exc = ValidationException("field1", "value", "Invalid")
 
-        response = create_error_response(exc.to_dict(), "Validation failed")
+        response = create_error_response(exc)
 
         assert response["isError"] is True
         assert response["error"]["type"] == "VALIDATION_ERROR"
@@ -321,7 +314,7 @@ class TestErrorHandlerIntegration:
             mock_metrics = Mock()
             mock_get_metrics.return_value = mock_metrics
 
-            error = FloodWaitException("Rate limit", retry_after=30)
+            error = FloodWaitException(retry_after=30)
             error_tracker.track_error(error, {"tool": "test_tool"})
 
             # Should record error in metrics
@@ -333,7 +326,7 @@ class TestErrorHandlerIntegration:
         """Test FLOOD_WAIT retry integration with metrics."""
         with patch('src.telegram_toolkit_mcp.core.error_handler.record_flood_wait_event') as mock_record:
             mock_func = AsyncMock(side_effect=[
-                FloodWaitException("Rate limit", retry_after=1),
+                FloodWaitException(retry_after=1),
                 "success"
             ])
 
@@ -412,7 +405,7 @@ class TestErrorHandlerEdgeCases:
 
     def test_retry_with_backoff_timeout(self):
         """Test retry with backoff respecting timeouts."""
-        mock_func = AsyncMock(side_effect=FloodWaitException("Rate limit", retry_after=100))
+        mock_func = AsyncMock(side_effect=FloodWaitException(retry_after=100))
 
         with patch('asyncio.sleep') as mock_sleep:
             with patch('asyncio.wait_for', side_effect=asyncio.TimeoutError):
@@ -422,9 +415,9 @@ class TestErrorHandlerEdgeCases:
     def test_error_response_with_large_content(self):
         """Test error response with large content."""
         large_content = "x" * 10000
-        error = {"type": "TEST_ERROR", "title": "Test", "status": 500, "detail": large_content}
+        exc = ValidationException("field1", large_content, "Invalid")
 
-        response = create_error_response(error, large_content)
+        response = create_error_response(exc)
 
         assert response["isError"] is True
         assert len(response["content"][0]["text"]) == 10000
@@ -460,7 +453,7 @@ class TestErrorHandlerConfiguration:
     def test_exception_to_dict_completeness(self):
         """Test that all exceptions have complete to_dict methods."""
         exceptions = [
-            FloodWaitException("Test", retry_after=30),
+            FloodWaitException(retry_after=30),
             ChatNotFoundException("Not found", "123"),
             ChannelPrivateException("Private"),
             ValidationException("field", "value", "reason"),

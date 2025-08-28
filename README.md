@@ -55,14 +55,14 @@ pip install telegram-toolkit-mcp
 
 ### From Source
 ```bash
-git clone https://github.com/your-org/telegram-toolkit-mcp.git
+git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
 cd telegram-toolkit-mcp
 pip install -e .
 ```
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-org/telegram-toolkit-mcp.git
+git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
 cd telegram-toolkit-mcp
 pip install -e ".[dev,observability]"
 ```
@@ -256,7 +256,7 @@ Standardized error codes:
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/telegram-toolkit-mcp.git
+git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
 cd telegram-toolkit-mcp
 
 # Create virtual environment
@@ -599,7 +599,7 @@ spec:
     spec:
       containers:
       - name: telegram-toolkit-mcp
-        image: your-registry/telegram-toolkit-mcp:latest
+        image: DronPascal/telegram-toolkit-mcp:latest
         ports:
         - containerPort: 8000
         env:
@@ -768,7 +768,7 @@ The test suite includes comprehensive mocks for:
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/telegram-toolkit-mcp.git
+git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
 cd telegram-toolkit-mcp
 
 # Install dependencies

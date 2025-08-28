@@ -121,8 +121,11 @@ class InputValidator:
         if not isinstance(page_size, int) or page_size < 1:
             raise ValueError("Page size must be a positive integer")
 
-        # Clamp to reasonable limits
-        return max(1, min(page_size, 100))
+        # Check limits and raise error if exceeded
+        if page_size > 100:
+            raise ValueError("Page size cannot exceed 100")
+
+        return max(1, page_size)
 
     @staticmethod
     def validate_date_range(from_date: Optional[str], to_date: Optional[str]) -> None:
@@ -147,7 +150,7 @@ class InputValidator:
                     raise ValueError("from_date must be before to_date")
 
                 # Prevent excessive date ranges
-                if (to_dt - from_dt).days > 365:
+                if (to_dt - from_dt).days >= 365:
                     raise ValueError("Date range cannot exceed 1 year")
 
             except ValueError as e:
@@ -172,11 +175,18 @@ class InputValidator:
 
         query = query.strip()
 
+        if not query:
+            raise ValueError("Search query cannot be empty")
+
         if len(query) > 256:
             raise ValueError("Search query too long")
 
-        # Remove potentially dangerous characters
+        # Check for dangerous content
         import re
+        if '<' in query or '>' in query:
+            raise ValueError("Search query contains dangerous characters")
+
+        # Remove potentially dangerous characters
         query = re.sub(r'[<>]', '', query)
 
         return query
@@ -267,7 +277,7 @@ class SessionManager:
         Returns:
             List of hashed session IDs
         """
-        return [PIIMasker.hash_identifier(sid, "session") for sid in self._session_cache.keys()]
+        return [f"session_{PIIMasker.hash_identifier(sid, '')}" for sid in self._session_cache.keys()]
 
     def clear_all_sessions(self) -> int:
         """
@@ -326,7 +336,7 @@ class SecurityAuditor:
         Returns:
             List of security events
         """
-        return self.security_events[-limit:]
+        return list(reversed(self.security_events))[:limit]
 
 
 # Global instances

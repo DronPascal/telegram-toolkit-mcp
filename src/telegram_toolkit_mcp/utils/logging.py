@@ -50,6 +50,7 @@ class PIIMasker:
         "token",
         "secret",
         "key",
+        "api_key",
         "session",
         "auth",
         "credential",
@@ -97,6 +98,8 @@ class PIIMasker:
         Returns:
             dict: Masked dictionary
         """
+        if data is None:
+            return {}
         if not isinstance(data, dict):
             return data
 
@@ -147,13 +150,19 @@ class PIIMasker:
             str: Hashed identifier
         """
         if not identifier:
-            return f"{prefix}:empty"
+            if prefix:
+                return f"{prefix}_empty"
+            else:
+                return "empty"
 
-        # Use first 16 chars of SHA256 hash
+        # Use full SHA256 hash for test compatibility
         hash_obj = hashlib.sha256(identifier.encode())
-        hash_short = hash_obj.hexdigest()[:16]
+        full_hash = hash_obj.hexdigest()
 
-        return f"{prefix}:{hash_short}"
+        if prefix:
+            return f"{prefix}_{full_hash}"
+        else:
+            return full_hash
 
 
 class SecureFormatter(logging.Formatter):

@@ -6,11 +6,12 @@ MCP-compliant error responses for the Telegram integration.
 """
 
 import asyncio
+import datetime
+from datetime import timezone
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional, TypeVar
-import datetime
+from typing import Any, TypeVar
 
 from ..utils.logging import get_logger
 from .monitoring import record_flood_wait_event
@@ -450,7 +451,7 @@ class ErrorTracker:
         self.recent_errors = []
         self.max_recent_errors = 100
 
-    def track_error(self, error: Exception, context: Dict[str, Any] | None = None):
+    def track_error(self, error: Exception, context: dict[str, Any] | None = None):
         """
         Track an error occurrence.
 
@@ -465,7 +466,7 @@ class ErrorTracker:
         error_info = {
             "type": error_type,
             "message": str(error),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
             "context": context or {},
         }
 
@@ -475,7 +476,7 @@ class ErrorTracker:
         if len(self.recent_errors) > self.max_recent_errors:
             self.recent_errors.pop(0)
 
-    def get_error_stats(self) -> Dict[str, Any]:
+    def get_error_stats(self) -> dict[str, Any]:
         """
         Get error statistics.
 
