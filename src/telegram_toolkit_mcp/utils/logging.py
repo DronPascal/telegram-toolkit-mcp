@@ -20,15 +20,32 @@ class PIIMasker:
 
     # Patterns for sensitive information
     SENSITIVE_PATTERNS = [
-        # Phone numbers
-        re.compile(r"\+\d{10,}"),
+        # Phone numbers (international format)
+        re.compile(r"\+\d{1,4}[\s\-\.]?\(?\d{1,4}\)?[\s\-\.]?\d{1,4}[\s\-\.]?\d{1,4}[\s\-\.]?\d{0,4}"),
         # Email addresses
         re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
-        # API keys/hashes (long hex strings)
+        # API keys/hashes (32+ hex chars)
         re.compile(r"\b[a-fA-F0-9]{32,}\b"),
-        # Telegram session strings (base64-like)
+        # Telegram session strings (base64-like, 100+ chars)
         re.compile(r"[A-Za-z0-9+/=]{100,}"),
+        # Telegram API credentials
+        re.compile(r"(?i)(api_id|api_hash|session_string|telegram_token)\s*[=:]\s*['\"]?([^'\"\s]{10,})['\"]?"),
+        # IP addresses
+        re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
+        # URLs with sensitive parameters
+        re.compile(r"https?://[^\s]*?(?:token|key|secret|password|session)[^\s]*"),
+        # Chat IDs (large numeric strings)
+        re.compile(r"(?<!\d)-?\d{8,}(?!\d)"),
+        # User mentions with sensitive info
+        re.compile(r"@[a-zA-Z0-9_]{3,}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
     ]
+
+    # Fields that should always be masked
+    SENSITIVE_FIELDS = {
+        'password', 'token', 'secret', 'key', 'session', 'auth', 'credential',
+        'api_id', 'api_hash', 'session_string', 'phone', 'email', 'user_id',
+        'chat_id', 'message_id', 'file_id', 'access_token', 'refresh_token'
+    }
 
     @staticmethod
     def mask_text(text: str) -> str:
@@ -49,6 +66,54 @@ class PIIMasker:
             masked = pattern.sub("[REDACTED]", masked)
 
         return masked
+
+    @staticmethod
+    def mask_dict(data: dict) -> dict:
+        """
+        Recursively mask sensitive information in dictionary.
+
+        Args:
+            data: Dictionary to mask
+
+        Returns:
+            dict: Masked dictionary
+        """
+        if not isinstance(data, dict):
+            return data
+
+        masked = {}
+        for key, value in data.items():
+            # Mask sensitive field names
+            if key.lower() in PIIMasker.SENSITIVE_FIELDS:
+                masked[key] = "[REDACTED]"
+            elif isinstance(value, dict):
+                masked[key] = PIIMasker.mask_dict(value)
+            elif isinstance(value, list):
+                masked[key] = [PIIMasker.mask_value(item) for item in data[key]]
+            else:
+                masked[key] = PIIMasker.mask_value(value)
+
+        return masked
+
+    @staticmethod
+    def mask_value(value: Any) -> Any:
+        """
+        Mask a single value if it contains sensitive information.
+
+        Args:
+            value: Value to mask
+
+        Returns:
+            Masked value
+        """
+        if isinstance(value, str):
+            return PIIMasker.mask_text(value)
+        elif isinstance(value, dict):
+            return PIIMasker.mask_dict(value)
+        elif isinstance(value, list):
+            return [PIIMasker.mask_value(item) for item in value]
+        else:
+            return value
 
     @staticmethod
     def hash_identifier(identifier: str, prefix: str = "hash") -> str:

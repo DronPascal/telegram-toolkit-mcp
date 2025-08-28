@@ -30,6 +30,7 @@ from ..core.error_handler import (
 )
 from ..models.types import ResolveChatResponse
 from ..core.monitoring import record_tool_success, record_tool_error, MetricsTimer
+from ..utils.security import get_rate_limiter, InputValidator, get_security_auditor
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -159,6 +160,63 @@ async def resolve_chat_tool(
     # Start metrics timer for the tool execution
     with MetricsTimer('tool', 'tg.resolve_chat') as timer:
         try:
+            # Rate limiting check
+            rate_limiter = get_rate_limiter()
+            allowed, wait_time = await rate_limiter.check_rate_limit(f"resolve_chat:{input}")
+
+            if not allowed:
+                get_security_auditor().log_security_event(
+                    "rate_limit_exceeded",
+                    {
+                        "tool": "tg.resolve_chat",
+                        "input": input,
+                        "wait_time": wait_time
+                    }
+                )
+                return {
+                    "isError": True,
+                    "error": {
+                        "type": "RATE_LIMIT_EXCEEDED",
+                        "title": "Rate limit exceeded",
+                        "status": 429,
+                        "detail": f"Too many requests. Please wait {wait_time:.1f} seconds."
+                    },
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Rate limit exceeded. Please wait {wait_time:.1f} seconds before retrying."
+                        }
+                    ]
+                }
+
+            # Input validation and sanitization
+            try:
+                input = InputValidator.sanitize_chat_identifier(input)
+            except ValueError as e:
+                get_security_auditor().log_security_event(
+                    "input_validation_failed",
+                    {
+                        "tool": "tg.resolve_chat",
+                        "input": input,
+                        "error": str(e)
+                    }
+                )
+                return {
+                    "isError": True,
+                    "error": {
+                        "type": "INPUT_VALIDATION_ERROR",
+                        "title": "Input validation failed",
+                        "status": 400,
+                        "detail": str(e)
+                    },
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Invalid input: {e}"
+                        }
+                    ]
+                }
+
             logger.info("Resolving chat identifier", input=input)
 
         # Validate input

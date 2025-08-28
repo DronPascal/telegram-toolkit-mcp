@@ -40,6 +40,11 @@ from ..core.monitoring import (
     record_ndjson_export,
     MetricsTimer
 )
+from ..utils.security import (
+    get_rate_limiter,
+    InputValidator,
+    get_security_auditor
+)
 from ..models.types import MessageInfo, PageInfo, ExportInfo
 from ..utils.logging import get_logger
 
@@ -279,6 +284,77 @@ async def fetch_history_tool(
     # Start metrics timer for the tool execution
     with MetricsTimer('tool', 'tg.fetch_history') as timer:
         try:
+            # Rate limiting check
+            rate_limiter = get_rate_limiter()
+            allowed, wait_time = await rate_limiter.check_rate_limit(f"fetch_history:{chat}")
+
+            if not allowed:
+                get_security_auditor().log_security_event(
+                    "rate_limit_exceeded",
+                    {
+                        "tool": "tg.fetch_history",
+                        "chat": chat,
+                        "wait_time": wait_time
+                    }
+                )
+                return {
+                    "isError": True,
+                    "error": {
+                        "type": "RATE_LIMIT_EXCEEDED",
+                        "title": "Rate limit exceeded",
+                        "status": 429,
+                        "detail": f"Too many requests. Please wait {wait_time:.1f} seconds."
+                    },
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Rate limit exceeded. Please wait {wait_time:.1f} seconds before retrying."
+                        }
+                    ]
+                }
+
+            # Input validation and sanitization
+            try:
+                chat = InputValidator.sanitize_chat_identifier(chat)
+                page_size = InputValidator.validate_page_size(page_size)
+                InputValidator.validate_date_range(from_date, to_date)
+
+                if search:
+                    search = InputValidator.sanitize_search_query(search)
+
+                if cursor:
+                    # Basic cursor format validation
+                    import base64
+                    try:
+                        base64.b64decode(cursor)
+                    except Exception:
+                        raise ValueError("Invalid cursor format")
+
+            except ValueError as e:
+                get_security_auditor().log_security_event(
+                    "input_validation_failed",
+                    {
+                        "tool": "tg.fetch_history",
+                        "input": {"chat": chat, "page_size": page_size, "search": search},
+                        "error": str(e)
+                    }
+                )
+                return {
+                    "isError": True,
+                    "error": {
+                        "type": "INPUT_VALIDATION_ERROR",
+                        "title": "Input validation failed",
+                        "status": 400,
+                        "detail": str(e)
+                    },
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Invalid input: {e}"
+                        }
+                    ]
+                }
+
             logger.info(
                 "Fetching message history",
                 chat=chat,
