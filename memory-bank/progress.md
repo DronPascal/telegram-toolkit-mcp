@@ -203,6 +203,12 @@ python scripts/run_performance_tests.py --test-type analysis
 - **Full E2E Flow**: ✅ Ready for execution
 
 #### **🚀 E2E Testing Execution (Step 5/10)**
+- [x] tg.resolve_chat functionality test with @durov - ✅ **SETUP COMPLETE, NEEDS AUTH**
+- [ ] tg.fetch_history functionality test with real data
+- [ ] Error scenarios testing (rate limits, network issues)
+- [ ] Large dataset handling test
+- [ ] Pagination and cursor functionality validation
+- [ ] Security auditing integration test
 
 #### **⚡ Performance Testing (Step 6/10)**
 - [x] Benchmark testing execution (✅ Working)

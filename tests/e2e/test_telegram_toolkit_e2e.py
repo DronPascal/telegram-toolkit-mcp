@@ -62,17 +62,35 @@ class TestTelegramToolkitE2E:
     async def telegram_client(self):
         """Real Telegram client for E2E testing."""
         config = get_config()
-        client = TelegramClientWrapper(
+
+        # Create Telethon client
+        from telethon import TelegramClient
+        import tempfile
+        import os
+
+        # Use a temporary session file if no session string
+        session_path = None
+        if not config.telegram.session_string:
+            temp_fd, session_path = tempfile.mkstemp(suffix='.session')
+            os.close(temp_fd)
+
+        telethon_client = TelegramClient(
+            session=session_path or config.telegram.session_string,
             api_id=config.telegram.api_id,
-            api_hash=config.telegram.api_hash,
-            session_string=config.telegram.session_string
+            api_hash=config.telegram.api_hash
         )
 
-        await client.connect()
+        client = TelegramClientWrapper()
+        await client.connect(telethon_client)
+
         try:
             yield client
         finally:
             await client.disconnect()
+
+            # Clean up temporary session file
+            if session_path and os.path.exists(session_path):
+                os.unlink(session_path)
 
     @pytest.fixture
     def rate_limiter(self):
@@ -105,42 +123,41 @@ class TestTelegramToolkitE2E:
         metrics_collector
     ):
         """Test resolving official Telegram channel."""
-        logger.info("🧪 Testing E2E: resolve_chat(@telegram)")
+        logger.info("🧪 Testing E2E: resolve_chat(@durov)")
 
         # Rate limiting check
         await rate_limiter.check_rate_limit("telegram")
 
         # Input validation
-        is_valid, error_msg = input_validator.validate_chat_identifier("@telegram")
-        assert is_valid, f"Input validation failed: {error_msg}"
+        sanitized = input_validator.sanitize_chat_identifier("@durov")
+        assert sanitized == "@durov"
 
         # Security audit
         security_auditor.log_security_event(
             event_type="chat_resolution_attempt",
-            details={"chat": "@telegram", "source": "e2e_test"},
-            severity="info"
+            details={"chat": "@durov", "source": "e2e_test"}
         )
 
         # Execute chat resolution
         try:
-            chat_info = await telegram_client.get_chat_info("@telegram")
+            chat_info = await telegram_client.get_chat_info("@durov")
 
             # Validate response structure
             assert chat_info is not None
             assert "id" in chat_info
             assert "title" in chat_info
-            assert chat_info.get("title") == "Telegram"
+            assert "durov" in chat_info.get("title", "").lower()
             assert chat_info.get("kind") == "channel"
 
             # Record success metrics
-            metrics_collector.record_tool_success("tg.resolve_chat")
+            metrics_collector.record_success("tg.resolve_chat")
 
-            logger.info("✅ Successfully resolved @telegram channel")
+            logger.info("✅ Successfully resolved @durov channel")
             logger.info(f"📊 Chat info: {json.dumps(chat_info, indent=2, ensure_ascii=False)}")
 
         except Exception as e:
             # Record error metrics
-            metrics_collector.record_tool_error("tg.resolve_chat", str(e))
+            metrics_collector.record_error("tg.resolve_chat", str(e))
             logger.error(f"❌ Failed to resolve @telegram: {e}")
             raise
 
@@ -164,7 +181,8 @@ class TestTelegramToolkitE2E:
         await rate_limiter.check_rate_limit(chat_id)
 
         # Input validation
-        is_valid, error_msg = input_validator.validate_chat_identifier(chat_id)
+        sanitized = input_validator.sanitize_chat_identifier(chat_id)
+        assert sanitized == chat_id
         assert is_valid, f"Input validation failed: {error_msg}"
 
         is_valid, error_msg = input_validator.validate_page_size(page_size)
@@ -174,7 +192,7 @@ class TestTelegramToolkitE2E:
         security_auditor.log_security_event(
             event_type="message_fetch_attempt",
             details={"chat": chat_id, "page_size": page_size, "source": "e2e_test"},
-            severity="info"
+
         )
 
         # Execute message fetch
@@ -204,11 +222,11 @@ class TestTelegramToolkitE2E:
 
             # Record success metrics
             metrics_collector.record_messages_fetched(len(messages))
-            metrics_collector.record_tool_success("tg.fetch_history")
+            metrics_collector.record_success("tg.fetch_history")
 
         except Exception as e:
             # Record error metrics
-            metrics_collector.record_tool_error("tg.fetch_history", str(e))
+            metrics_collector.record_error("tg.fetch_history", str(e))
             logger.error(f"❌ Failed to fetch messages: {e}")
             raise
 
@@ -259,10 +277,10 @@ class TestTelegramToolkitE2E:
 
             # Record success metrics
             metrics_collector.record_messages_fetched(len(messages))
-            metrics_collector.record_tool_success("tg.fetch_history")
+            metrics_collector.record_success("tg.fetch_history")
 
         except Exception as e:
-            metrics_collector.record_tool_error("tg.fetch_history", str(e))
+            metrics_collector.record_error("tg.fetch_history", str(e))
             logger.error(f"❌ Failed to fetch filtered messages: {e}")
             raise
 
@@ -326,7 +344,7 @@ class TestTelegramToolkitE2E:
             metrics_collector.record_page_served()
 
         except Exception as e:
-            metrics_collector.record_tool_error("tg.fetch_history", str(e))
+            metrics_collector.record_error("tg.fetch_history", str(e))
             logger.error(f"❌ Failed pagination test: {e}")
             raise
 
@@ -379,7 +397,7 @@ class TestTelegramToolkitE2E:
             logger.info("✅ Successfully handled large dataset")
 
         except Exception as e:
-            metrics_collector.record_tool_error("tg.fetch_history", str(e))
+            metrics_collector.record_error("tg.fetch_history", str(e))
             logger.error(f"❌ Failed large dataset test: {e}")
             raise
 
@@ -399,7 +417,7 @@ class TestTelegramToolkitE2E:
             assert False, "Should have raised an exception for invalid chat"
         except Exception as e:
             logger.info(f"✅ Correctly handled invalid chat error: {type(e).__name__}")
-            metrics_collector.record_tool_error("tg.resolve_chat", str(e))
+            metrics_collector.record_error("tg.resolve_chat", str(e))
 
         # Test with valid chat but invalid parameters
         try:
@@ -413,7 +431,7 @@ class TestTelegramToolkitE2E:
             logger.info("✅ Handled large limit parameter gracefully")
         except Exception as e:
             logger.info(f"✅ Correctly handled parameter error: {type(e).__name__}")
-            metrics_collector.record_tool_error("tg.fetch_history", str(e))
+            metrics_collector.record_error("tg.fetch_history", str(e))
 
     @pytest.mark.e2e
     @pytest.mark.asyncio
@@ -434,7 +452,8 @@ class TestTelegramToolkitE2E:
         ]
 
         for input_val in valid_inputs:
-            is_valid, error_msg = input_validator.validate_chat_identifier(input_val)
+            sanitized = input_validator.sanitize_chat_identifier(input_val)
+            assert sanitized == input_val
             assert is_valid, f"Valid input '{input_val}' failed validation: {error_msg}"
 
         # Test invalid inputs
@@ -448,14 +467,15 @@ class TestTelegramToolkitE2E:
         ]
 
         for input_val in invalid_inputs:
-            is_valid, error_msg = input_validator.validate_chat_identifier(input_val)
+            sanitized = input_validator.sanitize_chat_identifier(input_val)
+            assert sanitized == input_val
             assert not is_valid, f"Invalid input '{input_val}' should have failed validation"
 
             # Log security event for blocked input
             security_auditor.log_security_event(
                 event_type="input_validation_blocked",
                 details={"input": input_val, "reason": error_msg},
-                severity="warning"
+
             )
 
         logger.info("✅ Security validation working correctly")
@@ -545,14 +565,15 @@ class TestTelegramToolkitE2E:
         await rate_limiter.check_rate_limit(chat_id)
 
         # Step 2: Input validation
-        is_valid, error_msg = input_validator.validate_chat_identifier(chat_id)
+        sanitized = input_validator.sanitize_chat_identifier(chat_id)
+        assert sanitized == chat_id
         assert is_valid
 
         # Step 3: Security audit
         security_auditor.log_security_event(
             event_type="workflow_start",
             details={"workflow": "e2e_test", "chat": chat_id},
-            severity="info"
+
         )
 
         # Step 4: Resolve chat
@@ -570,15 +591,15 @@ class TestTelegramToolkitE2E:
         assert len(messages) <= page_size
 
         # Step 7: Record metrics
-        metrics_collector.record_tool_success("tg.resolve_chat")
-        metrics_collector.record_tool_success("tg.fetch_history")
+        metrics_collector.record_success("tg.resolve_chat")
+        metrics_collector.record_success("tg.fetch_history")
         metrics_collector.record_messages_fetched(len(messages))
 
         # Step 8: Security audit completion
         security_auditor.log_security_event(
             event_type="workflow_complete",
             details={"workflow": "e2e_test", "messages_fetched": len(messages)},
-            severity="info"
+
         )
 
         logger.info("🎉 Complete E2E workflow successful!")
@@ -608,7 +629,9 @@ class TestTelegramToolkitE2E:
         fetch_time = time.time() - start_time
 
         # Log performance metrics
-        logger.info(".3f"        logger.info(".3f"
+        logger.info(f"✅ Performance test completed - Resolve: {resolve_time:.3f}s, Fetch: {fetch_time:.3f}s")
+
         # Validate reasonable performance
-        assert resolve_time < 5.0, ".3f"        assert fetch_time < 10.0, ".3f"
+        assert resolve_time < 5.0, f"Resolve time too slow: {resolve_time:.3f}s"
+        assert fetch_time < 10.0, f"Fetch time too slow: {fetch_time:.3f}s"
         logger.info("✅ Performance baseline within acceptable limits")

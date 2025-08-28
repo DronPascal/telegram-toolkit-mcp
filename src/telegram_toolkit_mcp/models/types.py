@@ -6,7 +6,7 @@ Telegram API responses, and internal data structures.
 """
 
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 
 try:
     from pydantic import BaseModel, ConfigDict, Field
@@ -129,6 +129,31 @@ class ResolveChatResponse(BaseModel):
     member_count: int | None = Field(None, description="Member count")
     verified: bool = Field(False, description="Verification status")
     resolved_from: Dict[str, str] = Field(..., description="Original input information")
+
+    model_config = ConfigDict(frozen=True)
+
+
+class FetchHistoryRequest(BaseModel):
+    """Request model for fetching message history."""
+
+    chat: str = Field(..., description="Chat identifier to fetch from")
+    limit: int = Field(100, ge=1, le=1000, description="Maximum messages to fetch")
+    from_date: datetime | None = Field(None, description="Start date for filtering (UTC)")
+    to_date: datetime | None = Field(None, description="End date for filtering (UTC)")
+    cursor: str | None = Field(None, description="Pagination cursor")
+    include_attachments: bool = Field(False, description="Include attachment information")
+    search: str | None = Field(None, description="Text search query")
+
+    model_config = ConfigDict(frozen=True)
+
+
+class FetchHistoryResponse(BaseModel):
+    """Response model for message history fetch."""
+
+    messages: list[MessageInfo] = Field(..., description="Fetched messages")
+    page_info: PageInfo = Field(..., description="Pagination information")
+    export_info: ExportInfo | None = Field(None, description="Export information for large datasets")
+    total_fetched: int = Field(..., ge=0, description="Total messages fetched in this request")
 
     model_config = ConfigDict(frozen=True)
 
