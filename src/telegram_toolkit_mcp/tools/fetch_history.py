@@ -196,7 +196,41 @@ class MessageHistoryFetcher:
             },
             "search": {
                 "type": "string",
-                "description": "Search query to filter messages"
+                "description": "Search query to filter messages by text content"
+            },
+            "filter": {
+                "type": "object",
+                "description": "Advanced filtering options",
+                "properties": {
+                    "media_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["text", "photo", "video", "document", "audio", "voice", "sticker", "link", "poll"]
+                        },
+                        "description": "Filter by media types"
+                    },
+                    "has_media": {
+                        "type": "boolean",
+                        "description": "Filter messages with/without media attachments"
+                    },
+                    "from_users": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Filter by sender user IDs"
+                    },
+                    "min_views": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Minimum view count for messages"
+                    },
+                    "max_views": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Maximum view count for messages"
+                    }
+                },
+                "additionalProperties": false
             }
         },
         "additionalProperties": False
@@ -210,13 +244,15 @@ async def fetch_history_tool(
     cursor: Optional[str] = None,
     direction: str = "desc",
     search: Optional[str] = None,
+    filter: Optional[Dict[str, Any]] = None,
     ctx: Context = None
 ) -> Dict:
     """
-    MCP Tool: Fetch message history from Telegram chats with cursor-based pagination.
+    MCP Tool: Fetch message history from Telegram chats with advanced filtering.
 
     This tool retrieves message history from public Telegram chats
-    with support for date filtering, cursor-based pagination, and search.
+    with support for date filtering, cursor-based pagination, text search,
+    and advanced content filtering.
 
     Args:
         chat: Chat identifier (@username, t.me URL, or numeric ID)
@@ -225,7 +261,8 @@ async def fetch_history_tool(
         page_size: Number of messages per page (max 100)
         cursor: Base64-encoded cursor for pagination
         direction: Sort direction ("asc" or "desc")
-        search: Search query to filter messages
+        search: Search query to filter messages by text content
+        filter: Advanced filtering options (media types, users, views, etc.)
         ctx: MCP context (optional)
 
     Returns:
@@ -240,7 +277,8 @@ async def fetch_history_tool(
             page_size=page_size,
             cursor=cursor,
             direction=direction,
-            search=search
+            search=search,
+            filter=filter
         )
 
         # Validate inputs and parse dates
@@ -325,12 +363,47 @@ async def fetch_history_tool(
 
         # Apply server-side filtering and processing
         processor = get_message_processor()
+
+        # Extract filter parameters
+        media_types = filter.get("media_types") if filter else None
+        has_media = filter.get("has_media") if filter else None
+        from_users = filter.get("from_users") if filter else None
+        min_views = filter.get("min_views") if filter else None
+        max_views = filter.get("max_views") if filter else None
+
         messages = processor.process_messages(
             messages,
             from_date=from_date,
             to_date=to_date,
             search_query=search,
+            media_types=media_types,
+            sender_ids=from_users,
             deduplicate=True
+        )
+
+        # Apply additional filters that aren't handled by the processor
+        if has_media is not None:
+            if has_media:
+                messages = [msg for msg in messages if msg.get("has_media", False)]
+            else:
+                messages = [msg for msg in messages if not msg.get("has_media", False)]
+
+        if min_views is not None:
+            messages = [msg for msg in messages if (msg.get("views") or 0) >= min_views]
+
+        if max_views is not None:
+            messages = [msg for msg in messages if (msg.get("views") or 0) <= max_views]
+
+        logger.debug(
+            "Applied advanced filters",
+            total_filters={
+                "date_range": bool(from_date or to_date),
+                "search": bool(search),
+                "media_types": bool(media_types),
+                "has_media": has_media is not None,
+                "from_users": bool(from_users),
+                "views_range": bool(min_views is not None or max_views is not None)
+            }
         )
 
         # Determine if there are more messages
@@ -398,7 +471,14 @@ async def fetch_history_tool(
             has_more=has_more,
             total_fetched=current_cursor.fetched_count + len(messages),
             cursor_provided=bool(cursor),
-            direction=direction
+            direction=direction,
+            filters_applied={
+                "search": bool(search),
+                "media_types": bool(media_types),
+                "from_users": bool(from_users),
+                "views_filter": bool(min_views is not None or max_views is not None),
+                "date_range": bool(from_date or to_date)
+            }
         )
 
         # Create MCP-compliant response
