@@ -228,7 +228,7 @@ class TestMetricsTimer:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{status="success",tool="test_tool"' in metrics
+        assert 'mcp_tool_calls_total{chat_type="unknown",status="success",tool="test_tool"}' in metrics
 
     def test_timer_error_path(self):
         """Test timer with failed operation."""
@@ -243,7 +243,7 @@ class TestMetricsTimer:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{status="error",tool="test_tool"' in metrics
+        assert 'mcp_tool_calls_total{chat_type="unknown",status="error",tool="test_tool"}' in metrics
 
     def test_timer_api_operation(self):
         """Test timer with API operation."""
@@ -407,7 +407,7 @@ class TestMetricsEdgeCases:
 
         metrics = metrics_collector.get_metrics()
         # Should have recorded 50 total calls (5 workers * 10 calls each)
-        assert 'mcp_tool_calls_total{status="success",tool="worker_0"' in metrics
+        assert 'mcp_tool_calls_total{chat_type="unknown",status="success",tool="worker_0"}' in metrics
 
     def test_metrics_memory_efficiency(self, metrics_collector):
         """Test that metrics don't consume excessive memory."""
