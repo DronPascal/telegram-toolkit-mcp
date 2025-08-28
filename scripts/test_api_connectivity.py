@@ -1,6 +1,36 @@
 #!/usr/bin/env python3
 """
-Simple Telegram API connection test
+Telegram API Connectivity Test Script
+
+This script tests basic connectivity to the Telegram API using the
+configured credentials. It validates that the API connection works
+without requiring full user authorization.
+
+Usage:
+    python3 scripts/test_api_connectivity.py
+
+Features:
+    - Tests Telegram API connectivity
+    - Validates API credentials
+    - Checks network connectivity
+    - Provides basic API response validation
+    - No user authorization required
+
+Requirements:
+    - Valid TELEGRAM_API_ID and TELEGRAM_API_HASH in .env
+    - Internet connection
+    - python-dotenv package
+
+Output:
+    - Connection status and latency
+    - API credential validation
+    - Basic connectivity confirmation
+    - Error diagnostics if connection fails
+
+Note:
+    This test only validates API connectivity, not user authorization.
+    For full E2E testing with user data, use test_resolve_chat_e2e.py
+    after running auth_telegram_session.py
 """
 import sys
 import os

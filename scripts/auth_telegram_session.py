@@ -2,8 +2,41 @@
 """
 Telegram Session Authorization Script
 
-This script helps authorize a Telegram session for E2E testing.
-Run this once to set up the session, then E2E tests will work.
+This script performs interactive authorization of a Telegram session for
+the Telegram Toolkit MCP server. It guides through the phone number
+verification process and securely stores the session string.
+
+Usage:
+    python3 scripts/auth_telegram_session.py
+
+Features:
+    - Interactive phone number input
+    - SMS/verification code handling
+    - Secure session string generation and storage
+    - Automatic .env file updates
+    - Channel access testing (@telegram)
+    - Comprehensive error handling
+
+Requirements:
+    - Valid TELEGRAM_API_ID and TELEGRAM_API_HASH in .env
+    - Active phone number registered with Telegram
+    - Internet connection for Telegram API access
+    - Access to Telegram app for verification codes
+
+Security Notes:
+    - Session strings are encrypted and stored securely
+    - No sensitive data is logged or displayed
+    - Session files are cleaned up automatically
+    - .env file contains only the session string reference
+
+Process:
+    1. Load existing configuration and credentials
+    2. Establish connection to Telegram API
+    3. Prompt for phone number and verification
+    4. Complete authorization and generate session
+    5. Save session string to .env file
+    6. Test channel access and validate setup
+    7. Provide success confirmation and next steps
 """
 import sys
 import os
