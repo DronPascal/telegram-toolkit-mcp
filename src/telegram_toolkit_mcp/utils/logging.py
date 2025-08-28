@@ -21,7 +21,9 @@ class PIIMasker:
     # Patterns for sensitive information
     SENSITIVE_PATTERNS = [
         # Phone numbers (international format)
-        re.compile(r"\+\d{1,4}[\s\-\.]?\(?\d{1,4}\)?[\s\-\.]?\d{1,4}[\s\-\.]?\d{1,4}[\s\-\.]?\d{0,4}"),
+        re.compile(
+            r"\+\d{1,4}[\s\-\.]?\(?\d{1,4}\)?[\s\-\.]?\d{1,4}[\s\-\.]?\d{1,4}[\s\-\.]?\d{0,4}"
+        ),
         # Email addresses
         re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
         # API keys/hashes (32+ hex chars)
@@ -29,7 +31,9 @@ class PIIMasker:
         # Telegram session strings (base64-like, 100+ chars)
         re.compile(r"[A-Za-z0-9+/=]{100,}"),
         # Telegram API credentials
-        re.compile(r"(?i)(api_id|api_hash|session_string|telegram_token)\s*[=:]\s*['\"]?([^'\"\s]{10,})['\"]?"),
+        re.compile(
+            r"(?i)(api_id|api_hash|session_string|telegram_token)\s*[=:]\s*['\"]?([^'\"\s]{10,})['\"]?"
+        ),
         # IP addresses
         re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
         # URLs with sensitive parameters
@@ -42,9 +46,24 @@ class PIIMasker:
 
     # Fields that should always be masked
     SENSITIVE_FIELDS = {
-        'password', 'token', 'secret', 'key', 'session', 'auth', 'credential',
-        'api_id', 'api_hash', 'session_string', 'phone', 'email', 'user_id',
-        'chat_id', 'message_id', 'file_id', 'access_token', 'refresh_token'
+        "password",
+        "token",
+        "secret",
+        "key",
+        "session",
+        "auth",
+        "credential",
+        "api_id",
+        "api_hash",
+        "session_string",
+        "phone",
+        "email",
+        "user_id",
+        "chat_id",
+        "message_id",
+        "file_id",
+        "access_token",
+        "refresh_token",
     }
 
     @staticmethod
@@ -222,18 +241,20 @@ class StructuredLogger:
                 entry["span_id"] = value
             elif key == "tool" and value:
                 entry["tool"] = value
-            elif key == "duration" and isinstance(value, (int, float)):
+            elif key == "log_level" and value:  # Handle log_level field
+                entry["log_level"] = value
+            elif key == "duration" and isinstance(value, int | float):
                 entry["duration"] = value
             elif key == "status" and value:
                 entry["status"] = value
             elif key == "fetched" and isinstance(value, int):
                 entry["fetched"] = value
-            elif key == "flood_wait_seconds" and isinstance(value, (int, float)):
+            elif key == "flood_wait_seconds" and isinstance(value, int | float):
                 entry["flood_wait_seconds"] = value
             # For unknown fields, mask and include if safe
             elif isinstance(value, str):
                 entry[key] = self.masker.mask_text(value)
-            elif isinstance(value, (int, float, bool)):
+            elif isinstance(value, int | float | bool):
                 entry[key] = value
 
         return entry
@@ -366,7 +387,7 @@ def setup_logging() -> None:
 
     # Our logger will handle its own output
     logger = get_logger()
-    logger.info("Logging system initialized", level="INFO")
+    logger.info("Logging system initialized", log_level="INFO")
 
 
 # Initialize logging when module is imported

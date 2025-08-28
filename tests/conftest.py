@@ -3,13 +3,11 @@ Pytest configuration and fixtures for Telegram Toolkit MCP.
 """
 
 import asyncio
-import json
 import os
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock, MagicMock
-from typing import Dict, List, Any
+from unittest.mock import MagicMock
 
 import pytest
 from dotenv import load_dotenv
@@ -112,6 +110,7 @@ async def mock_telegram_client():
 def mock_prometheus_registry():
     """Fixture for Prometheus registry in tests."""
     from prometheus_client import CollectorRegistry
+
     return CollectorRegistry()
 
 
@@ -119,6 +118,7 @@ def mock_prometheus_registry():
 def mock_metrics_collector(mock_prometheus_registry):
     """Fixture for metrics collector with test registry."""
     from src.telegram_toolkit_mcp.core.monitoring import MetricsCollector
+
     return MetricsCollector(registry=mock_prometheus_registry)
 
 
@@ -129,7 +129,7 @@ def mock_security_context():
         "client_ip": "192.168.1.100",
         "user_agent": "TestClient/1.0",
         "request_id": "test-request-123",
-        "session_id": "test-session-456"
+        "session_id": "test-session-456",
     }
 
 
@@ -142,7 +142,7 @@ def mock_cursor():
         "min_id": None,
         "max_id": None,
         "fetched_count": 50,
-        "direction": "desc"
+        "direction": "desc",
     }
 
 
@@ -154,7 +154,7 @@ def mock_filter_params():
         "has_media": True,
         "from_users": [67890, 67891],
         "min_views": 10,
-        "max_views": 1000
+        "max_views": 1000,
     }
 
 
@@ -184,12 +184,12 @@ def sample_messages():
                 "last_name": "Test",
                 "username": f"user{i}",
                 "bot": False,
-                "verified": False
+                "verified": False,
             },
             "views": 10 + i * 5,
             "forwards": i,
             "has_media": i % 3 == 0,  # Every third message has media
-            "media_type": "photo" if i % 3 == 0 else None
+            "media_type": "photo" if i % 3 == 0 else None,
         }
         for i in range(10)
     ]
@@ -298,6 +298,7 @@ def sample_chat_data():
 
 # E2E Test Fixtures
 
+
 @pytest.fixture(scope="session")
 def e2e_test_config():
     """Configuration for E2E tests."""
@@ -329,20 +330,17 @@ def e2e_test_data():
             "with_media": {"has_media": True},
             "text_only": {"media_types": ["text"]},
             "popular": {"min_views": 100},
-        }
+        },
     }
 
 
 @pytest.fixture
 def mock_mcp_request():
     """Mock MCP request for testing."""
+
     def _make_request(method: str, **params):
-        return {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": method,
-            "params": params
-        }
+        return {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+
     return _make_request
 
 
@@ -356,14 +354,14 @@ def expected_mcp_response():
             "content": [
                 {
                     "type": "text",
-                    "text": "{}"  # Will be filled with actual data
+                    "text": "{}",  # Will be filled with actual data
                 }
             ]
-        }
+        },
     }
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def e2e_skip_without_credentials():
     """Skip E2E tests if Telegram credentials are not available."""
     required_vars = ["TELEGRAM_API_ID", "TELEGRAM_API_HASH"]
@@ -378,8 +376,8 @@ def e2e_performance_thresholds():
     """Performance thresholds for E2E tests."""
     return {
         "chat_resolution_max_time": 5.0,  # seconds
-        "message_fetch_max_time": 10.0,   # seconds
-        "large_dataset_max_time": 15.0,   # seconds
+        "message_fetch_max_time": 10.0,  # seconds
+        "large_dataset_max_time": 15.0,  # seconds
         "min_messages_per_page": 1,
         "max_messages_per_page": 100,
     }
@@ -389,23 +387,14 @@ def e2e_performance_thresholds():
 def e2e_error_scenarios():
     """Error scenarios for E2E testing."""
     return {
-        "invalid_chat": {
-            "input": "invalid_chat_12345",
-            "expected_error": "CHAT_NOT_FOUND"
-        },
-        "private_channel": {
-            "input": "@some_private_channel",
-            "expected_error": "CHANNEL_PRIVATE"
-        },
+        "invalid_chat": {"input": "invalid_chat_12345", "expected_error": "CHAT_NOT_FOUND"},
+        "private_channel": {"input": "@some_private_channel", "expected_error": "CHANNEL_PRIVATE"},
         "invalid_parameters": {
             "chat": "@telegram",
             "page_size": 1000,  # Too large
-            "expected_error": "VALIDATION_ERROR"
+            "expected_error": "VALIDATION_ERROR",
         },
-        "rate_limit_exceeded": {
-            "chat": "@telegram",
-            "expected_error": "FLOOD_WAIT"
-        }
+        "rate_limit_exceeded": {"chat": "@telegram", "expected_error": "FLOOD_WAIT"},
     }
 
 
@@ -416,29 +405,29 @@ def e2e_workflow_steps():
         {
             "step": "discover_tools",
             "method": "tools/list",
-            "expected_tools": ["tg.resolve_chat", "tg.fetch_history"]
+            "expected_tools": ["tg.resolve_chat", "tg.fetch_history"],
         },
         {
             "step": "resolve_chat",
             "method": "tools/call",
             "tool": "tg.resolve_chat",
             "args": {"input": "@telegram"},
-            "expected_fields": ["chat_id", "title", "kind"]
+            "expected_fields": ["chat_id", "title", "kind"],
         },
         {
             "step": "fetch_history",
             "method": "tools/call",
             "tool": "tg.fetch_history",
             "args": {"chat": "@telegram", "page_size": 5},
-            "expected_fields": ["messages", "page_info"]
+            "expected_fields": ["messages", "page_info"],
         },
         {
             "step": "pagination",
             "method": "tools/call",
             "tool": "tg.fetch_history",
             "args": {"chat": "@telegram", "page_size": 10},
-            "expected_pagination": ["has_more", "cursor"]
-        }
+            "expected_pagination": ["has_more", "cursor"],
+        },
     ]
 
 
@@ -460,7 +449,7 @@ def e2e_monitoring_checks():
             "mcp_tool_calls_total",
             "telegram_api_calls_total",
             "telegram_messages_fetched_total",
-            "telegram_toolkit_errors_total"
+            "telegram_toolkit_errors_total",
         ],
         "success_rate_threshold": 0.95,  # 95% success rate minimum
         "max_error_rate": 0.05,  # 5% error rate maximum

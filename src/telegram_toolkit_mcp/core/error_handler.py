@@ -6,12 +6,14 @@ MCP-compliant error responses for the Telegram integration.
 """
 
 import asyncio
+from collections import defaultdict
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
-from typing import Any, TypeVar
+from typing import Any, Dict, Optional, TypeVar
+import datetime
 
 from ..utils.logging import get_logger
-from .monitoring import record_flood_wait_event, get_metrics_collector
+from .monitoring import record_flood_wait_event
 
 logger = get_logger(__name__)
 
@@ -172,7 +174,7 @@ def map_telethon_exception(exc: Exception) -> TelegramMCPException:
     Returns:
         TelegramMCPException: Mapped MCP exception
     """
-    exc_type = type(exc).__name__
+    _exc_type = type(exc).__name__
     exc_str = str(exc)
 
     # Handle specific Telethon exceptions
@@ -235,7 +237,7 @@ class RetryConfig:
 
 
 async def retry_with_backoff(
-    func: Callable[..., T], retry_config: Optional[RetryConfig] = None, *args, **kwargs
+    func: Callable[..., T], retry_config: RetryConfig | None = None, *args, **kwargs
 ) -> T:
     """
     Execute a function with exponential backoff retry logic.
@@ -284,11 +286,11 @@ async def retry_with_backoff(
 
             # Record FLOOD_WAIT event in metrics
             # Extract tool name from function name if available
-            tool_name = getattr(func, '__name__', 'unknown')
-            if hasattr(func, '__qualname__'):
+            tool_name = getattr(func, "__name__", "unknown")
+            if hasattr(func, "__qualname__"):
                 # Extract tool name from qualname (e.g., 'resolve_chat_tool' from 'resolve_chat_tool.<locals>.wrapper')
-                qualname_parts = func.__qualname__.split('.')
-                if len(qualname_parts) > 1 and qualname_parts[-1] == 'wrapper':
+                qualname_parts = func.__qualname__.split(".")
+                if len(qualname_parts) > 1 and qualname_parts[-1] == "wrapper":
                     tool_name = qualname_parts[0]
 
             record_flood_wait_event(tool_name, attempt + 1, wait_time)
@@ -406,7 +408,7 @@ def retry_on_failure(
     max_attempts: int = 3,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
-    retry_on: tuple = (FloodWaitException, Exception)
+    retry_on: tuple = (FloodWaitException, Exception),
 ):
     """
     Decorator for automatic retry with backoff.
@@ -420,21 +422,19 @@ def retry_on_failure(
     Returns:
         Decorated function
     """
+
     def decorator(func):
         async def wrapper(*args, **kwargs):
             retry_config = RetryConfig(
                 max_attempts=max_attempts,
                 initial_delay=initial_delay,
-                backoff_factor=backoff_factor
+                backoff_factor=backoff_factor,
             )
 
-            return await retry_with_backoff(
-                func,
-                retry_config=retry_config,
-                *args,
-                **kwargs
-            )
+            return await retry_with_backoff(func, retry_config=retry_config, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -450,7 +450,7 @@ class ErrorTracker:
         self.recent_errors = []
         self.max_recent_errors = 100
 
-    def track_error(self, error: Exception, context: Optional[Dict[str, Any]] = None):
+    def track_error(self, error: Exception, context: Dict[str, Any] | None = None):
         """
         Track an error occurrence.
 
@@ -466,7 +466,7 @@ class ErrorTracker:
             "type": error_type,
             "message": str(error),
             "timestamp": datetime.utcnow().isoformat(),
-            "context": context or {}
+            "context": context or {},
         }
 
         self.recent_errors.append(error_info)
@@ -486,7 +486,7 @@ class ErrorTracker:
             "error_counts": dict(self.error_counts),
             "total_errors": sum(self.error_counts.values()),
             "recent_errors": self.recent_errors[-10:],  # Last 10 errors
-            "unique_error_types": len(self.error_counts)
+            "unique_error_types": len(self.error_counts),
         }
 
     def should_alert(self, error_type: str, threshold: int = 10) -> bool:
@@ -528,5 +528,5 @@ __all__ = [
     "ErrorTracker",
     "get_error_tracker",
     "create_error_response",
-    "create_success_response"
+    "create_success_response",
 ]
