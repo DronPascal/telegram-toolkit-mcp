@@ -9,7 +9,7 @@ description = "MCP server for Telegram message history extraction"
 authors = [
     {name = "Telegram Toolkit MCP Team", email = "team@telegram-toolkit-mcp.dev"}
 ]
-license = {text = "MIT"}
+license = {text = "Apache"}
 readme = "README.md"
 requires-python = ">=3.11"
 keywords = ["mcp", "telegram", "api", "messages", "extraction"]

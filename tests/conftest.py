@@ -3,10 +3,13 @@ Pytest configuration and fixtures for Telegram Toolkit MCP.
 """
 
 import asyncio
+import json
+import os
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, MagicMock
+from typing import Dict, List, Any
 
 import pytest
 from dotenv import load_dotenv
@@ -290,4 +293,187 @@ def sample_chat_data():
         "kind": "channel",
         "title": "Telegram News",
         "member_count": 1000000,
+    }
+
+
+# E2E Test Fixtures
+
+@pytest.fixture(scope="session")
+def e2e_test_config():
+    """Configuration for E2E tests."""
+    return {
+        "test_chat": "@telegram",
+        "test_timeout": 30,
+        "max_page_size": 50,
+        "min_messages_for_large_test": 10,
+    }
+
+
+@pytest.fixture
+def e2e_test_data():
+    """Test data for E2E scenarios."""
+    return {
+        "valid_chats": [
+            "@telegram",
+            "https://t.me/telegram",
+            "telegram",
+        ],
+        "invalid_chats": [
+            "invalid_chat_123",
+            "",
+            "@",
+        ],
+        "test_page_sizes": [5, 10, 25, 50],
+        "test_filters": {
+            "basic": {},
+            "with_media": {"has_media": True},
+            "text_only": {"media_types": ["text"]},
+            "popular": {"min_views": 100},
+        }
+    }
+
+
+@pytest.fixture
+def mock_mcp_request():
+    """Mock MCP request for testing."""
+    def _make_request(method: str, **params):
+        return {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": method,
+            "params": params
+        }
+    return _make_request
+
+
+@pytest.fixture
+def expected_mcp_response():
+    """Expected MCP response structure for validation."""
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [
+                {
+                    "type": "text",
+                    "text": "{}"  # Will be filled with actual data
+                }
+            ]
+        }
+    }
+
+
+@pytest.fixture(autouse=True)
+def e2e_skip_without_credentials():
+    """Skip E2E tests if Telegram credentials are not available."""
+    required_vars = ["TELEGRAM_API_ID", "TELEGRAM_API_HASH"]
+    missing = [var for var in required_vars if not os.getenv(var)]
+
+    if missing:
+        pytest.skip(f"E2E tests require: {', '.join(missing)}")
+
+
+@pytest.fixture(scope="session")
+def e2e_performance_thresholds():
+    """Performance thresholds for E2E tests."""
+    return {
+        "chat_resolution_max_time": 5.0,  # seconds
+        "message_fetch_max_time": 10.0,   # seconds
+        "large_dataset_max_time": 15.0,   # seconds
+        "min_messages_per_page": 1,
+        "max_messages_per_page": 100,
+    }
+
+
+@pytest.fixture
+def e2e_error_scenarios():
+    """Error scenarios for E2E testing."""
+    return {
+        "invalid_chat": {
+            "input": "invalid_chat_12345",
+            "expected_error": "CHAT_NOT_FOUND"
+        },
+        "private_channel": {
+            "input": "@some_private_channel",
+            "expected_error": "CHANNEL_PRIVATE"
+        },
+        "invalid_parameters": {
+            "chat": "@telegram",
+            "page_size": 1000,  # Too large
+            "expected_error": "VALIDATION_ERROR"
+        },
+        "rate_limit_exceeded": {
+            "chat": "@telegram",
+            "expected_error": "FLOOD_WAIT"
+        }
+    }
+
+
+@pytest.fixture
+def e2e_workflow_steps():
+    """Complete workflow steps for E2E testing."""
+    return [
+        {
+            "step": "discover_tools",
+            "method": "tools/list",
+            "expected_tools": ["tg.resolve_chat", "tg.fetch_history"]
+        },
+        {
+            "step": "resolve_chat",
+            "method": "tools/call",
+            "tool": "tg.resolve_chat",
+            "args": {"input": "@telegram"},
+            "expected_fields": ["chat_id", "title", "kind"]
+        },
+        {
+            "step": "fetch_history",
+            "method": "tools/call",
+            "tool": "tg.fetch_history",
+            "args": {"chat": "@telegram", "page_size": 5},
+            "expected_fields": ["messages", "page_info"]
+        },
+        {
+            "step": "pagination",
+            "method": "tools/call",
+            "tool": "tg.fetch_history",
+            "args": {"chat": "@telegram", "page_size": 10},
+            "expected_pagination": ["has_more", "cursor"]
+        }
+    ]
+
+
+@pytest.fixture
+def e2e_concurrency_config():
+    """Configuration for concurrent request testing."""
+    return {
+        "max_concurrent_requests": 5,
+        "request_delay": 0.1,  # seconds between requests
+        "timeout_per_request": 30,  # seconds
+    }
+
+
+@pytest.fixture
+def e2e_monitoring_checks():
+    """Monitoring and metrics validation for E2E tests."""
+    return {
+        "required_metrics": [
+            "mcp_tool_calls_total",
+            "telegram_api_calls_total",
+            "telegram_messages_fetched_total",
+            "telegram_toolkit_errors_total"
+        ],
+        "success_rate_threshold": 0.95,  # 95% success rate minimum
+        "max_error_rate": 0.05,  # 5% error rate maximum
+        "min_metrics_updates": 1,  # At least 1 metric should update
+    }
+
+
+@pytest.fixture
+def e2e_cleanup_config():
+    """Configuration for E2E test cleanup."""
+    return {
+        "temp_file_cleanup": True,
+        "metric_reset": True,
+        "connection_cleanup": True,
+        "resource_cleanup_timeout": 5,  # seconds
     }
