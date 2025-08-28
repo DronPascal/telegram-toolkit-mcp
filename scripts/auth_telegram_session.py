@@ -32,12 +32,20 @@ async def authorize_session():
 
     # Create Telethon client
     from telethon import TelegramClient
+    from telethon.sessions import StringSession
 
-    # Use the session string from config if available, otherwise create temp file
-    session_path = config.telegram.session_string or 'telegram_session.session'
+    # Use StringSession for in-memory session management
+    if config.telegram.session_string and config.telegram.session_string.strip():
+        try:
+            session = StringSession(config.telegram.session_string)
+        except ValueError:
+            print("⚠️  Existing session string is invalid, creating new session...")
+            session = StringSession()
+    else:
+        session = StringSession()
 
     client = TelegramClient(
-        session=session_path,
+        session=session,
         api_id=config.telegram.api_id,
         api_hash=config.telegram.api_hash
     )
@@ -54,31 +62,33 @@ async def authorize_session():
             print(f"👤 Authorized as: @{me.username} (ID: {me.id})")
 
             # Save session string to .env if needed
-            if not config.telegram.session_string:
-                print("\n💾 Saving session string to .env file...")
-                session_string = client.session.save()
+            print("\n💾 Saving session string to .env file...")
+            session_string = client.session.save()
 
-                # Update .env file
-                env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-                with open(env_path, 'r') as f:
-                    lines = f.readlines()
+            # Update .env file
+            env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+            with open(env_path, 'r') as f:
+                lines = f.readlines()
 
-                # Replace or add TELEGRAM_STRING_SESSION
-                session_found = False
-                for i, line in enumerate(lines):
-                    if line.startswith('TELEGRAM_STRING_SESSION='):
-                        lines[i] = f'TELEGRAM_STRING_SESSION={session_string}\n'
-                        session_found = True
-                        break
+            # Replace or add TELEGRAM_STRING_SESSION
+            session_found = False
+            for i, line in enumerate(lines):
+                if line.startswith('TELEGRAM_STRING_SESSION='):
+                    lines[i] = f'TELEGRAM_STRING_SESSION={session_string}\n'
+                    session_found = True
+                    break
 
-                if not session_found:
-                    lines.append(f'TELEGRAM_STRING_SESSION={session_string}\n')
+            if not session_found:
+                lines.append(f'TELEGRAM_STRING_SESSION={session_string}\n')
 
-                with open(env_path, 'w') as f:
-                    f.writelines(lines)
+            with open(env_path, 'w') as f:
+                f.writelines(lines)
 
-                print("✅ Session string saved to .env file")
+            print("✅ Session string saved to .env file")
+            if session_string:
                 print(f"🔐 Session: {session_string[:20]}...")
+            else:
+                print("🔐 Session: (empty string)")
 
         else:
             print("❌ Session not authorized. Please complete authorization:")
@@ -121,15 +131,18 @@ async def authorize_session():
                     f.writelines(lines)
 
                 print("✅ Session string saved to .env file")
-                print(f"🔐 Session: {session_string[:20]}...")
+                if session_string:
+                    print(f"🔐 Session: {session_string[:20]}...")
+                else:
+                    print("🔐 Session: (empty string)")
 
                 # Test channel access
                 print("\n🔍 Testing channel access...")
                 try:
-                    entity = await client.get_entity('@durov')
-                    print(f"✅ @durov channel accessible: {entity.title}")
+                    entity = await client.get_entity('@telegram')
+                    print(f"✅ @telegram channel accessible: {entity.title}")
                 except Exception as e:
-                    print(f"⚠️  @durov access failed: {e}")
+                    print(f"⚠️  @telegram access failed: {e}")
                     print("   This may be due to privacy settings or channel restrictions")
 
             else:

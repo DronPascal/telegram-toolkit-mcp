@@ -201,7 +201,7 @@ class TestMetricsErrorHandlerIntegration:
         """Test correlation between error tracking and metrics."""
         # Track specific error patterns
         tools = ["tg.fetch_history", "tg.resolve_chat", "tg.fetch_history"]
-        chats = ["@durov", "private_chat", "@telegram"]
+        chats = ["@telegram", "private_chat", "@telegram"]
 
         for i, (tool, chat) in enumerate(zip(tools, chats)):
             if i % 2 == 0:

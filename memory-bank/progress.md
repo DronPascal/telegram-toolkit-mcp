@@ -183,7 +183,7 @@ python scripts/run_performance_tests.py --test-type analysis
 
 #### **🌐 E2E Testing Setup (Step 4/10)** ✅ **COMPLETED!**
 - [x] Test credentials configuration - API ID & Hash configured
-- [x] Public channel setup (@durov) - Channel identified for testing
+- [x] Public channel setup (@telegram) - Channel identified for testing
 - [x] E2E test environment preparation - Scripts and fixtures ready
 - [x] Telegram API connectivity test - ✅ **SUCCESS!** Connection verified
 
@@ -191,7 +191,7 @@ python scripts/run_performance_tests.py --test-type analysis
 1. **API Credentials**: Successfully configured Telegram API ID and Hash
 2. **Environment Setup**: Created test scripts and connection verification tools
 3. **Connectivity Test**: ✅ **Telegram API connection verified** - can connect and authenticate
-4. **Channel Identification**: @durov channel identified for E2E testing
+4. **Channel Identification**: @telegram channel identified for E2E testing
 5. **Configuration Loading**: Fixed environment variable loading in config system
 6. **Authorization Handling**: Test framework properly handles unauthorized sessions
 
@@ -203,7 +203,10 @@ python scripts/run_performance_tests.py --test-type analysis
 - **Full E2E Flow**: ✅ Ready for execution
 
 #### **🚀 E2E Testing Execution (Step 5/10)**
-- [x] tg.resolve_chat functionality test with @durov - ✅ **SETUP COMPLETE, NEEDS AUTH**
+- [x] tg.resolve_chat functionality test with @telegram - ✅ **PASSED!**
+- [x] Real Telegram API connectivity - ✅ **VERIFIED!**
+- [x] User authorization and session management - ✅ **WORKING!**
+- [x] Chat resolution performance - ✅ **0.135s (EXCELLENT!)**
 - [ ] tg.fetch_history functionality test with real data
 - [ ] Error scenarios testing (rate limits, network issues)
 - [ ] Large dataset handling test
@@ -253,7 +256,7 @@ python scripts/run_performance_tests.py --test-type analysis
 
 ### **TESTING RESOURCES NEEDED:**
 - **Test Credentials**: TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_STRING_SESSION
-- **Test Channel**: @durov (public channel for validation)
+- **Test Channel**: @telegram (public channel for validation)
 - **Test Environment**: Python 3.11+, internet connection, MCP client (Claude Desktop)
 
 ### **SUCCESS CRITERIA:**

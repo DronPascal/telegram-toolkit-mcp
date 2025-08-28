@@ -65,11 +65,11 @@ async def test_connection():
             # Test resolving a public channel
             print('\n🔍 Testing public channel resolution...')
             try:
-                entity = await client._client.get_entity('@durov')
-                print(f'✅ @durov channel resolved: {entity.title} (ID: {entity.id})')
+                entity = await client._client.get_entity('@telegram')
+                print(f'✅ @telegram channel resolved: {entity.title} (ID: {entity.id})')
                 print(f'   Type: {type(entity).__name__}')
             except Exception as e:
-                print(f'❌ Failed to resolve @durov: {e}')
+                print(f'❌ Failed to resolve @telegram: {e}')
 
         else:
             print('❌ Connection failed - client not connected')
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     print("=" * 50)
     if result:
         print("🎉 CONNECTION TEST PASSED!")
-        print("✅ Ready for E2E testing with @durov channel")
+        print("✅ Ready for E2E testing with @telegram channel")
     else:
         print("❌ CONNECTION TEST FAILED!")
         print("🔧 Please check your API credentials")

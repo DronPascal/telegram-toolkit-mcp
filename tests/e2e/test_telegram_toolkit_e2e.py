@@ -123,24 +123,24 @@ class TestTelegramToolkitE2E:
         metrics_collector
     ):
         """Test resolving official Telegram channel."""
-        logger.info("🧪 Testing E2E: resolve_chat(@durov)")
+        logger.info("🧪 Testing E2E: resolve_chat(@telegram)")
 
         # Rate limiting check
         await rate_limiter.check_rate_limit("telegram")
 
         # Input validation
-        sanitized = input_validator.sanitize_chat_identifier("@durov")
-        assert sanitized == "@durov"
+        sanitized = input_validator.sanitize_chat_identifier("@telegram")
+        assert sanitized == "@telegram"
 
         # Security audit
         security_auditor.log_security_event(
             event_type="chat_resolution_attempt",
-            details={"chat": "@durov", "source": "e2e_test"}
+            details={"chat": "@telegram", "source": "e2e_test"}
         )
 
         # Execute chat resolution
         try:
-            chat_info = await telegram_client.get_chat_info("@durov")
+            chat_info = await telegram_client.get_chat_info("@telegram")
 
             # Validate response structure
             assert chat_info is not None
@@ -152,7 +152,7 @@ class TestTelegramToolkitE2E:
             # Record success metrics
             metrics_collector.record_success("tg.resolve_chat")
 
-            logger.info("✅ Successfully resolved @durov channel")
+            logger.info("✅ Successfully resolved @telegram channel")
             logger.info(f"📊 Chat info: {json.dumps(chat_info, indent=2, ensure_ascii=False)}")
 
         except Exception as e:
