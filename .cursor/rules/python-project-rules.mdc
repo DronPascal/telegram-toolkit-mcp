@@ -1,0 +1,64 @@
+---
+alwaysApply: true
+description: Python project rules for the MCP "Telegram Toolkit": strict typing, Ruff (lint+format), pure core vs. thin adapters, Pydantic v2 models, orjson NDJSON (1 object per line, newline-terminated), async hygiene & cancellation, bounded concurrency, jittered retries, Problem Details mapping, structured JSON logs (no message text), property-based tests, pinned dependencies, pre-commit hooks, resource safety, UTC/RFC3339 time discipline.
+---
+# Python (project) rules
+
+- **Typing is mandatory.**
+  Enable `from __future__ import annotations`; no untyped defs; avoid `Any`.
+  Run `mypy --strict` (allowlist only for third-party stubs).
+
+- **Ruff first.**
+  Enforce `ruff` (lint + format). Enable rulesets: `E,F,I,UP,PL,ASYNC,BLE,SIM,NPY`.
+  Line length **100**; sort and group imports deterministically.
+
+- **Pure core, thin I/O.**
+  Keep pure pagination/filtering/NDJSON emission in `core/` (no I/O).
+  Put Telethon/MCP integration into `adapters/`.
+
+- **Pydantic v2 models.**
+  Define models for `structuredContent` and NDJSON rows; set `model_config = {"frozen": True}`.
+  All `datetime` fields are timezone-aware UTC and serialize to **RFC3339**.
+
+- **JSON round-trip / NDJSON.**
+  Use `orjson` with `OPT_NAIVE_UTC` and `OPT_APPEND_NEWLINE`.
+  Exactly **1 JSON object per line**, newline-terminated. Write to a temp file and **atomic rename**.
+
+- **Async hygiene.**
+  All Telethon calls are `async` and wrapped in `asyncio.timeout(...)`.
+  Propagate cancellation (`CancelledError`)—never swallow it.
+
+- **Concurrency limits.**
+  Use a global `asyncio.Semaphore` for MTProto concurrency.
+  Implement per-chat **single-flight** (key = export hash) and in-memory result caching for concurrent identical requests.
+
+- **Retries with jitter.**
+  Retry **only transient** errors using exponential backoff + **full jitter** + hard cap.
+  Do **not** retry non-idempotent operations unless guarded by an **Idempotency-Key**.
+
+- **Problem Details mapping.**
+  No `bare except`. Map Telethon exceptions to our domain errors
+  (`FLOOD_WAIT`, `CHANNEL_PRIVATE`, etc.) and return `application/problem+json`.
+
+- **Logging.**
+  Structured JSON logs; never include message text or usernames.
+  Required fields: `ts, level, tool, trace_id, chat_hash, cursor, fetched`.
+
+- **Tests.**
+  Use `pytest` + `hypothesis`. Property tests must cover:
+  `concat(pages) == set(window)` (modulo deletions), strict ASC ordering, and cursor stability.
+  Keep a 24h **golden export** from a public channel and assert schema + pagination invariants.
+
+- **Packaging.**
+  Maintain `pyproject.toml` with **hard pins**; use `uv lock` (or `pip-tools`) to produce a lock file.
+  Provide `extras = {dev = [...], test = [...]}`.
+
+- **Pre-commit.**
+  Hooks: ruff (lint/format), mypy, secret scan, end-of-file, large-files,
+  JSON Schema validate for `schemas/**`.
+
+- **Resource safety.**
+  Files/sockets only via context managers. Ensure Telethon client closes in app lifespan/shutdown.
+
+- **Time discipline.**
+  All time math in **UTC**; compare only normalized, timezone-aware datetimes (no locale-dependent logic).

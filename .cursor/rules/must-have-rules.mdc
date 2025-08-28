@@ -1,0 +1,41 @@
+---
+description: MCP/Telegram Must-Have rules: StructuredContent as source of truth + Problem Details; NDJSON resources with resources/updated; ASC pagination with deterministic opaque cursor; UTC time with strict [from;to] post-filter and de-duplication (no gaps/dupes); FloodWait resume with same cursor; input validation and limits; public-only scope via MTProto (Telethon); RED+p95 observability and a minimal SLO with freeze on budget overspend; privacy-safe logs and StringSession via env/KMS.
+alwaysApply: true
+---
+
+# MCP/Telegram — Must-Have Rules
+
+## Structured output & errors
+- **StructuredContent is the source of truth.** If a tool declares `outputSchema`, the reply **MUST** include `structuredContent` that validates against JSON Schema (Draft 2020-12). Provide a short `content[].text` summary, but clients must rely on `structuredContent`.
+- **Problem Details everywhere.** All errors use `application/problem+json` (`type,title,status,detail,instance`). Validation failures return **400**.
+
+## NDJSON resources & pagination
+- **Large results → NDJSON resource.** Put `export.uri` in `structuredContent` and a `ResourceLink` in `content[]`; then emit `resources/updated`.
+- **Ascending, stable pages.** Return messages strictly **ASC by (`date`,`id`)**. `cursor` is **opaque base64(JSON)** with `{last_id, asc:true}`.
+- **Deterministic continuation.** The next page sets **`min_id = last_id`** and the server **post-filters** `[from ≤ date ≤ to]` (MTProto offsets are exclusive).
+- **No gaps. No dupes.** Within `[from;to]`: `gap_ratio = 0`; `dup_ratio ≤ 0.5%` (dedupe by `id`). If violated, return `INPUT_RANGE` (Problem Details).
+
+## Time & filtering
+- **UTC only.** Input `from/to` are RFC3339 UTC (`...Z`); outputs serialize to RFC3339 UTC.
+- **Search caveat.** Always post-filter `[from;to]`. With `search`, Telegram may ignore `offset_date`; counts may vary between runs.
+
+## FloodWait handling
+- **Preserve progress.** On `FloodWaitError`, persist the cursor, return `FLOOD_WAIT` with `retry_after`, and resume with the **same** cursor after the pause. Do **not** launch parallel retries for the same peer.
+
+## Input validation & limits
+- **Schema gate.** Validate tool inputs against JSON Schema before execution; on violation return **400 INPUT_VALIDATION**.
+- **Bounds.** `page_size ∈ [1,100]`; `search` length ≤ 256; reject `from > to`. Reject unsupported `search+thread_id` combos with actionable guidance.
+
+## Scope & transport
+- **Public-only.** Only public channels/supergroups are supported; private/invite-only targets return `CHANNEL_PRIVATE`.
+- **MTProto for history.** Use Telethon (client MTProto), **never** Bot API for retrospective history.
+
+## Observability & SLO
+- **RED + latency histograms.** Expose `mcp_tool_calls_total{tool,status}`, `tg_fetch_history_messages_total`,
+  `tg_fetch_history_duration_seconds` (Histogram), `telegram_floodwait_seconds` (Histogram), `export_bytes_total`.
+- **Primary SLO.** p95 page latency ≤ **2.5 s** for `page_size ≤ 100`; success rate ≥ **99% / 30d**.
+  If the error budget is overspent → **feature freeze** until fixes land and a blameless postmortem (SEV1/2 within 48h) is completed.
+
+## Privacy & secrets
+- **No message text in logs.** Logs/metrics must not include message bodies or usernames; use a hashed `chat_id`.
+- **StringSession from env/KMS only.** Never write sessions to disk and never print them.
