@@ -21,13 +21,13 @@ class PIIMasker:
     # Patterns for sensitive information
     SENSITIVE_PATTERNS = [
         # Phone numbers
-        re.compile(r'\+\d{10,}'),
+        re.compile(r"\+\d{10,}"),
         # Email addresses
-        re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'),
+        re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
         # API keys/hashes (long hex strings)
-        re.compile(r'\b[a-fA-F0-9]{32,}\b'),
+        re.compile(r"\b[a-fA-F0-9]{32,}\b"),
         # Telegram session strings (base64-like)
-        re.compile(r'[A-Za-z0-9+/=]{100,}'),
+        re.compile(r"[A-Za-z0-9+/=]{100,}"),
     ]
 
     @staticmethod
@@ -46,7 +46,7 @@ class PIIMasker:
 
         masked = text
         for pattern in PIIMasker.SENSITIVE_PATTERNS:
-            masked = pattern.sub('[REDACTED]', masked)
+            masked = pattern.sub("[REDACTED]", masked)
 
         return masked
 
@@ -126,12 +126,7 @@ class StructuredLogger:
         # Prevent duplicate messages
         self._logger.propagate = False
 
-    def _create_log_entry(
-        self,
-        level: str,
-        message: str,
-        **kwargs
-    ) -> dict[str, Any]:
+    def _create_log_entry(self, level: str, message: str, **kwargs) -> dict[str, Any]:
         """
         Create structured log entry.
 
@@ -149,7 +144,7 @@ class StructuredLogger:
             "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
             "level": level,
             "logger": self.name,
-            "message": self.masker.mask_text(message)
+            "message": self.masker.mask_text(message),
         }
 
         # Add structured data
@@ -212,7 +207,7 @@ class StructuredLogger:
         fetched: int | None = None,
         error: str | None = None,
         trace_id: str | None = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Log MCP tool call with structured data.
@@ -239,7 +234,7 @@ class StructuredLogger:
             duration=duration,
             fetched=fetched,
             trace_id=trace_id,
-            **kwargs
+            **kwargs,
         )
 
     def log_telegram_api_call(
@@ -249,7 +244,7 @@ class StructuredLogger:
         success: bool = True,
         duration: float | None = None,
         flood_wait: float | None = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Log Telegram API call.
@@ -274,7 +269,7 @@ class StructuredLogger:
             status=status,
             duration=duration,
             flood_wait_seconds=flood_wait,
-            **kwargs
+            **kwargs,
         )
 
 

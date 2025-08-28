@@ -1,0 +1,105 @@
+name: Bug Report
+description: Report a bug or issue
+title: "[BUG] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+
+        Thank you for reporting a bug! Please provide as much detail as possible to help us resolve the issue quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug
+      placeholder: "What went wrong?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the bug
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: "What should have happened?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: "What actually happened?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - Critical - System unusable
+        - High - Major functionality broken
+        - Medium - Minor functionality broken
+        - Low - Cosmetic or minor issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Information about your environment
+      placeholder: |
+        - OS: [e.g., macOS 14.0, Ubuntu 22.04]
+        - Python version: [e.g., 3.11.5]
+        - Telegram Toolkit MCP version: [e.g., 0.1.0]
+        - MCP client: [e.g., Claude Desktop, custom client]
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs/Screenshots
+      description: Any relevant logs or screenshots
+      placeholder: |
+        Please attach any relevant logs, screenshots, or error messages.
+
+        Note: Be careful not to include sensitive information like API keys, session strings, or personal data.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any additional context about the problem
+      placeholder: "Any other context or information that might be helpful"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please check the following
+      options:
+        - label: I have searched for existing issues
+          required: true
+        - label: I have reproduced the issue with the latest version
+        - label: I have included all relevant information
+        - label: I understand that this is a volunteer-maintained project

@@ -1,0 +1,35 @@
+# Code owners for Telegram Toolkit MCP
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners
+* @your-github-username
+
+# Core server components
+src/telegram_toolkit_mcp/server.py @your-github-username
+src/telegram_toolkit_mcp/__init__.py @your-github-username
+
+# MCP Tools
+src/telegram_toolkit_mcp/tools/ @your-github-username
+
+# Core business logic
+src/telegram_toolkit_mcp/core/ @your-github-username
+
+# Data models and schemas
+src/telegram_toolkit_mcp/models/ @your-github-username
+
+# Utilities and helpers
+src/telegram_toolkit_mcp/utils/ @your-github-username
+
+# CI/CD and GitHub Actions
+.github/ @your-github-username
+
+# Documentation
+docs/ @your-github-username
+README.md @your-github-username
+
+# Tests
+tests/ @your-github-username
+
+# Configuration files
+pyproject.toml @your-github-username
+.pre-commit-config.yaml @your-github-username

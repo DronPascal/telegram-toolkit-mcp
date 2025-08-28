@@ -25,8 +25,7 @@ class TelegramConfig(BaseModel):
     api_id: int = Field(..., description="Telegram API ID from https://my.telegram.org")
     api_hash: str = Field(..., description="Telegram API Hash from https://my.telegram.org")
     session_string: str | None = Field(
-        default=None,
-        description="Telethon StringSession (auto-generated if not provided)"
+        default=None, description="Telethon StringSession (auto-generated if not provided)"
     )
 
     model_config = {"frozen": True}
@@ -46,23 +45,10 @@ class PerformanceConfig(BaseModel):
     """Performance tuning configuration."""
 
     flood_sleep_threshold: int = Field(
-        default=60,
-        ge=10,
-        le=300,
-        description="FLOOD_WAIT sleep threshold in seconds"
+        default=60, ge=10, le=300, description="FLOOD_WAIT sleep threshold in seconds"
     )
-    request_timeout: int = Field(
-        default=30,
-        ge=5,
-        le=120,
-        description="Request timeout in seconds"
-    )
-    max_page_size: int = Field(
-        default=100,
-        ge=1,
-        le=200,
-        description="Maximum messages per page"
-    )
+    request_timeout: int = Field(default=30, ge=5, le=120, description="Request timeout in seconds")
+    max_page_size: int = Field(default=100, ge=1, le=200, description="Maximum messages per page")
 
     model_config = {"frozen": True}
 
@@ -71,20 +57,13 @@ class ResourceConfig(BaseModel):
     """Resource management configuration."""
 
     temp_dir: str = Field(
-        default="/tmp/mcp-resources",
-        description="Temporary directory for NDJSON files"
+        default="/tmp/mcp-resources", description="Temporary directory for NDJSON files"
     )
     resource_max_age_hours: int = Field(
-        default=24,
-        ge=1,
-        le=168,
-        description="Maximum age of resource files in hours"
+        default=24, ge=1, le=168, description="Maximum age of resource files in hours"
     )
     ndjson_chunk_size: int = Field(
-        default=1000,
-        ge=100,
-        le=10000,
-        description="Chunk size for NDJSON processing"
+        default=1000, ge=100, le=10000, description="Chunk size for NDJSON processing"
     )
 
     model_config = {"frozen": True}
@@ -94,17 +73,12 @@ class ObservabilityConfig(BaseModel):
     """Observability configuration."""
 
     enable_prometheus_metrics: bool = Field(
-        default=True,
-        description="Enable Prometheus metrics collection"
+        default=True, description="Enable Prometheus metrics collection"
     )
     enable_opentelemetry_tracing: bool = Field(
-        default=True,
-        description="Enable OpenTelemetry distributed tracing"
+        default=True, description="Enable OpenTelemetry distributed tracing"
     )
-    otlp_endpoint: str | None = Field(
-        default=None,
-        description="OTLP endpoint for trace export"
-    )
+    otlp_endpoint: str | None = Field(default=None, description="OTLP endpoint for trace export")
 
     model_config = {"frozen": True}
 
@@ -137,7 +111,7 @@ def load_config() -> AppConfig:
         telegram_config = TelegramConfig(
             api_id=int(os.getenv("TELEGRAM_API_ID", "0")),
             api_hash=os.getenv("TELEGRAM_API_HASH", ""),
-            session_string=os.getenv("TELEGRAM_STRING_SESSION")
+            session_string=os.getenv("TELEGRAM_STRING_SESSION"),
         )
 
         # Load other configurations
@@ -146,24 +120,28 @@ def load_config() -> AppConfig:
             server=ServerConfig(
                 host=os.getenv("MCP_SERVER_HOST", "localhost"),
                 port=int(os.getenv("MCP_SERVER_PORT", "8000")),
-                log_level=os.getenv("MCP_SERVER_LOG_LEVEL", "INFO")
+                log_level=os.getenv("MCP_SERVER_LOG_LEVEL", "INFO"),
             ),
             performance=PerformanceConfig(
                 flood_sleep_threshold=int(os.getenv("FLOOD_SLEEP_THRESHOLD", "60")),
                 request_timeout=int(os.getenv("REQUEST_TIMEOUT", "30")),
-                max_page_size=int(os.getenv("MAX_PAGE_SIZE", "100"))
+                max_page_size=int(os.getenv("MAX_PAGE_SIZE", "100")),
             ),
             resources=ResourceConfig(
                 temp_dir=os.getenv("TEMP_DIR", "/tmp/mcp-resources"),
                 resource_max_age_hours=int(os.getenv("RESOURCE_MAX_AGE_HOURS", "24")),
-                ndjson_chunk_size=int(os.getenv("NDJSON_CHUNK_SIZE", "1000"))
+                ndjson_chunk_size=int(os.getenv("NDJSON_CHUNK_SIZE", "1000")),
             ),
             observability=ObservabilityConfig(
-                enable_prometheus_metrics=os.getenv("ENABLE_PROMETHEUS_METRICS", "true").lower() == "true",
-                enable_opentelemetry_tracing=os.getenv("ENABLE_OPENTELEMETRY_TRACING", "true").lower() == "true",
-                otlp_endpoint=os.getenv("OTLP_ENDPOINT")
+                enable_prometheus_metrics=os.getenv("ENABLE_PROMETHEUS_METRICS", "true").lower()
+                == "true",
+                enable_opentelemetry_tracing=os.getenv(
+                    "ENABLE_OPENTELEMETRY_TRACING", "true"
+                ).lower()
+                == "true",
+                otlp_endpoint=os.getenv("OTLP_ENDPOINT"),
             ),
-            debug=os.getenv("DEBUG", "false").lower() == "true"
+            debug=os.getenv("DEBUG", "false").lower() == "true",
         )
 
         return config

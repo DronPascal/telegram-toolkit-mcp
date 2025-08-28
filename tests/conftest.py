@@ -37,31 +37,33 @@ def test_config():
     # Mock configuration for tests
     return AppConfig(
         telegram=TelegramConfig(
-            api_id=12345,
-            api_hash="test_hash_12345678901234567890123456789012",
-            session_string=None
+            api_id=12345, api_hash="test_hash_12345678901234567890123456789012", session_string=None
         ),
-        server=ServerConfig(
-            host="localhost",
-            port=8000,
-            log_level="DEBUG"
-        ),
-        performance=type('PerformanceConfig', (), {
-            'flood_sleep_threshold': 30,
-            'request_timeout': 10,
-            'max_page_size': 50
-        })(),
-        resources=type('ResourceConfig', (), {
-            'temp_dir': '/tmp/test-resources',
-            'resource_max_age_hours': 1,
-            'ndjson_chunk_size': 100
-        })(),
-        observability=type('ObservabilityConfig', (), {
-            'enable_prometheus_metrics': False,
-            'enable_opentelemetry_tracing': False,
-            'otlp_endpoint': None
-        })(),
-        debug=True
+        server=ServerConfig(host="localhost", port=8000, log_level="DEBUG"),
+        performance=type(
+            "PerformanceConfig",
+            (),
+            {"flood_sleep_threshold": 30, "request_timeout": 10, "max_page_size": 50},
+        )(),
+        resources=type(
+            "ResourceConfig",
+            (),
+            {
+                "temp_dir": "/tmp/test-resources",
+                "resource_max_age_hours": 1,
+                "ndjson_chunk_size": 100,
+            },
+        )(),
+        observability=type(
+            "ObservabilityConfig",
+            (),
+            {
+                "enable_prometheus_metrics": False,
+                "enable_opentelemetry_tracing": False,
+                "otlp_endpoint": None,
+            },
+        )(),
+        debug=True,
     )
 
 
@@ -81,6 +83,7 @@ def setup_test_environment(monkeypatch, temp_dir):
 @pytest.fixture
 async def mock_telegram_client():
     """Mock Telegram client for testing."""
+
     # This would be replaced with actual mocking in real tests
     class MockClient:
         async def start(self):
@@ -103,21 +106,13 @@ async def mock_telegram_client():
 # Test markers
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "unit: Unit tests that don't require external dependencies"
-    )
+    config.addinivalue_line("markers", "unit: Unit tests that don't require external dependencies")
     config.addinivalue_line(
         "markers", "integration: Integration tests that may require mocked external services"
     )
-    config.addinivalue_line(
-        "markers", "e2e: End-to-end tests requiring real Telegram API access"
-    )
-    config.addinivalue_line(
-        "markers", "slow: Tests that take significant time to run"
-    )
-    config.addinivalue_line(
-        "markers", "telegram: Tests that interact with Telegram API"
-    )
+    config.addinivalue_line("markers", "e2e: End-to-end tests requiring real Telegram API access")
+    config.addinivalue_line("markers", "slow: Tests that take significant time to run")
+    config.addinivalue_line("markers", "telegram: Tests that interact with Telegram API")
 
 
 # Test data fixtures
@@ -127,16 +122,12 @@ def sample_message_data():
     return {
         "id": 12345,
         "date": "2025-01-01T10:30:00Z",
-        "from": {
-            "peer_id": "channel:136817688",
-            "kind": "channel",
-            "display": "Telegram"
-        },
+        "from": {"peer_id": "channel:136817688", "kind": "channel", "display": "Telegram"},
         "text": "Test message content",
         "views": 1000,
         "forwards": 50,
         "replies": 25,
-        "reactions": 10
+        "reactions": 10,
     }
 
 
@@ -147,5 +138,5 @@ def sample_chat_data():
         "chat_id": "136817688",
         "kind": "channel",
         "title": "Telegram News",
-        "member_count": 1000000
+        "member_count": 1000000,
     }

@@ -35,7 +35,7 @@ class AttachmentInfo(BaseModel):
     type: str = Field(
         ...,
         description="Attachment type",
-        examples=["photo", "video", "document", "audio", "voice", "sticker", "link", "poll"]
+        examples=["photo", "video", "document", "audio", "voice", "sticker", "link", "poll"],
     )
     mime: str | None = Field(None, description="MIME type for media files")
     size: int | None = Field(None, ge=0, description="File size in bytes")
@@ -66,16 +66,11 @@ class MessageInfo(BaseModel):
 
     # Attachments
     attachments: list[AttachmentInfo] = Field(
-        default_factory=list,
-        description="Message attachments"
+        default_factory=list, description="Message attachments"
     )
 
     model_config = ConfigDict(
-        frozen=True,
-        populate_by_name=True,
-        json_encoders={
-            datetime: lambda v: v.isoformat() + "Z"
-        }
+        frozen=True, populate_by_name=True, json_encoders={datetime: lambda v: v.isoformat() + "Z"}
     )
 
 
@@ -94,11 +89,7 @@ class ExportInfo(BaseModel):
     """Information about exported data."""
 
     uri: str = Field(..., description="Resource URI for exported data")
-    format: str = Field(
-        ...,
-        description="Export format",
-        examples=["ndjson", "csv"]
-    )
+    format: str = Field(..., description="Export format", examples=["ndjson", "csv"])
 
     model_config = ConfigDict(frozen=True)
 
@@ -107,11 +98,7 @@ class ChatInfo(BaseModel):
     """Basic chat information."""
 
     chat_id: str = Field(..., description="Telegram chat identifier")
-    kind: str = Field(
-        ...,
-        description="Chat type",
-        examples=["channel", "supergroup", "group"]
-    )
+    kind: str = Field(..., description="Chat type", examples=["channel", "supergroup", "group"])
     title: str = Field(..., description="Chat title/name")
     member_count: int | None = Field(None, ge=0, description="Member count")
 
@@ -130,8 +117,8 @@ class ErrorInfo(BaseModel):
             "USERNAME_INVALID",
             "AUTH_REQUIRED",
             "INPUT_VALIDATION",
-            "RATE_LIMITED"
-        ]
+            "RATE_LIMITED",
+        ],
     )
     message: str = Field(..., description="Human-readable error message")
     retry_after: int | None = Field(None, ge=0, description="Seconds to wait before retry")
