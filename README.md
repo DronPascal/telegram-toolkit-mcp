@@ -1,7 +1,7 @@
 # Telegram Toolkit MCP
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache-yellow.svg)](https://opensource.org/licenses/apache-2-0)
 [![MCP 2025-06-18](https://img.shields.io/badge/MCP-2025--06--18-green.svg)](https://modelcontextprotocol.io/)
 
 **Read-only MCP server for safe extraction of Telegram message history from public chats with proper pagination, error handling, and NDJSON resource streaming.**
