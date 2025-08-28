@@ -29,6 +29,7 @@ from ..core.error_handler import (
 )
 from ..core.pagination import Paginator, PaginationCursor, decode_cursor
 from ..core.filtering import get_message_processor, DateRangeFilter
+from ..core.ndjson_resources import get_resource_manager
 from ..models.types import MessageInfo, PageInfo, ExportInfo
 from ..utils.logging import get_logger
 
@@ -318,6 +319,38 @@ async def fetch_history_tool(
             next_cursor = current_cursor.get_next_cursor(messages[-1])
             next_cursor.fetched_count = current_cursor.fetched_count + len(messages)
 
+        # Create NDJSON resource for large datasets if needed
+        export_info = None
+        if len(messages) > 100:  # Threshold for creating resource
+            try:
+                resource_manager = get_resource_manager()
+                resource_info = await resource_manager.create_ndjson_resource(
+                    messages,
+                    metadata={
+                        "chat": chat,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                        "direction": direction,
+                        "search": search
+                    }
+                )
+                export_info = ExportInfo(
+                    uri=resource_info["uri"],
+                    format="ndjson"
+                ).model_dump()
+
+                logger.info(
+                    "NDJSON resource created for large dataset",
+                    resource_id=resource_info["resource_id"],
+                    item_count=len(messages)
+                )
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to create NDJSON resource, using inline data",
+                    error=str(e)
+                )
+
         # Format response
         response_data = MessageHistoryFetcher.format_messages_for_response(
             messages, validated_page_size, has_more
@@ -328,6 +361,10 @@ async def fetch_history_tool(
             response_data["page_info"]["cursor"] = next_cursor.encode()
         else:
             response_data["page_info"]["cursor"] = None
+
+        # Add export info if available
+        if export_info:
+            response_data["export"] = export_info
 
         logger.info(
             "Message history fetched successfully",

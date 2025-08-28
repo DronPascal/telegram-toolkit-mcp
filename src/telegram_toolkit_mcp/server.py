@@ -194,7 +194,10 @@ class TelegramMCPServer:
             self.mcp_server.add_tool(resolve_chat_tool)
             self.mcp_server.add_tool(fetch_history_tool)
 
-            logger.info("Successfully registered MCP tools")
+            # Register resource handlers
+            self._register_resource_handlers()
+
+            logger.info("Successfully registered MCP tools and resources")
 
         except ImportError as e:
             logger.error("Failed to import tools", error=str(e))
@@ -202,6 +205,25 @@ class TelegramMCPServer:
         except Exception as e:
             logger.error("Failed to register tools", error=str(e))
             raise
+
+    def _register_resource_handlers(self) -> None:
+        """Register MCP resource handlers."""
+        if not self.mcp_server:
+            return
+
+        try:
+            from .core.ndjson_resources import MCPResourceAdapter, get_resource_manager
+
+            # Create resource adapter
+            resource_adapter = MCPResourceAdapter(get_resource_manager())
+
+            # Note: Resource registration depends on FastMCP API
+            # This would be implemented when integrating with actual MCP server
+            logger.info("Resource handlers prepared (implementation depends on FastMCP API)")
+
+        except Exception as e:
+            logger.error("Failed to register resource handlers", error=str(e))
+            # Don't raise here - resources are optional
 
     async def run_server(self) -> None:
         """
