@@ -8,8 +8,9 @@ tool registration, and resource handling for Telegram message extraction.
 import asyncio
 import signal
 import sys
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any
 
 try:
     from mcp import FastMCP
@@ -17,7 +18,7 @@ except ImportError:
     # Fallback for development
     FastMCP = None
 
-from .utils.config import get_config, load_config, validate_telegram_credentials
+from .utils.config import get_config, validate_telegram_credentials
 from .utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +35,7 @@ class TelegramMCPServer:
     def __init__(self) -> None:
         """Initialize the MCP server with configuration."""
         self.config = get_config()
-        self.mcp_server: Optional[FastMCP] = None
+        self.mcp_server: FastMCP | None = None
         self.telegram_client = None
         self._shutdown_event = asyncio.Event()
 
@@ -50,7 +51,7 @@ class TelegramMCPServer:
             logger.error(
                 "Invalid Telegram API credentials",
                 api_id_provided=bool(self.config.telegram.api_id),
-                api_hash_provided=bool(self.config.telegram.api_hash)
+                api_hash_provided=bool(self.config.telegram.api_hash),
             )
             raise ValueError(
                 "Invalid Telegram API credentials. Please check TELEGRAM_API_ID "
@@ -80,8 +81,7 @@ class TelegramMCPServer:
             else:
                 session = StringSession()
                 logger.warning(
-                    "No session string provided - will need to authenticate",
-                    auth_required=True
+                    "No session string provided - will need to authenticate", auth_required=True
                 )
 
             # Create and configure client
@@ -101,7 +101,7 @@ class TelegramMCPServer:
                 logger.error(
                     "Telegram client not authorized",
                     auth_required=True,
-                    auth_url="https://my.telegram.org/auth"
+                    auth_url="https://my.telegram.org/auth",
                 )
                 raise RuntimeError(
                     "Telegram client not authorized. Please authenticate first "
@@ -111,7 +111,7 @@ class TelegramMCPServer:
             logger.info(
                 "Telegram client initialized successfully",
                 authorized=True,
-                user_id=self.telegram_client.session.user_id
+                user_id=self.telegram_client.session.user_id,
             )
 
         except ImportError:
@@ -171,7 +171,7 @@ class TelegramMCPServer:
             name="telegram-toolkit-mcp",
             version="0.1.0",
             description="Read-only MCP server for Telegram message history extraction",
-            lifespan=self.lifespan
+            lifespan=self.lifespan,
         )
 
         # Register tools will be added here
@@ -185,8 +185,21 @@ class TelegramMCPServer:
         if not self.mcp_server:
             return
 
-        # Tool registration will be implemented in separate modules
-        logger.info("Tool registration placeholder - tools will be registered here")
+        try:
+            # Import and register tools
+            from .tools.resolve_chat import resolve_chat_tool
+
+            # Register resolve_chat tool
+            self.mcp_server.add_tool(resolve_chat_tool)
+
+            logger.info("Successfully registered MCP tools")
+
+        except ImportError as e:
+            logger.error("Failed to import tools", error=str(e))
+            raise
+        except Exception as e:
+            logger.error("Failed to register tools", error=str(e))
+            raise
 
     async def run_server(self) -> None:
         """
@@ -208,9 +221,7 @@ class TelegramMCPServer:
 
         try:
             logger.info(
-                "Starting MCP server",
-                host=self.config.server.host,
-                port=self.config.server.port
+                "Starting MCP server", host=self.config.server.host, port=self.config.server.port
             )
 
             # Run the MCP server

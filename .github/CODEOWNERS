@@ -2,34 +2,34 @@
 # See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Global owners
-* @your-github-username
+* @DronPascal
 
 # Core server components
-src/telegram_toolkit_mcp/server.py @your-github-username
-src/telegram_toolkit_mcp/__init__.py @your-github-username
+src/telegram_toolkit_mcp/server.py @DronPascal
+src/telegram_toolkit_mcp/__init__.py @DronPascal
 
 # MCP Tools
-src/telegram_toolkit_mcp/tools/ @your-github-username
+src/telegram_toolkit_mcp/tools/ @DronPascal
 
 # Core business logic
-src/telegram_toolkit_mcp/core/ @your-github-username
+src/telegram_toolkit_mcp/core/ @DronPascal
 
 # Data models and schemas
-src/telegram_toolkit_mcp/models/ @your-github-username
+src/telegram_toolkit_mcp/models/ @DronPascal
 
 # Utilities and helpers
-src/telegram_toolkit_mcp/utils/ @your-github-username
+src/telegram_toolkit_mcp/utils/ @DronPascal
 
 # CI/CD and GitHub Actions
-.github/ @your-github-username
+.github/ @DronPascal
 
 # Documentation
-docs/ @your-github-username
-README.md @your-github-username
+docs/ @DronPascal
+README.md @DronPascal
 
 # Tests
-tests/ @your-github-username
+tests/ @DronPascal
 
 # Configuration files
-pyproject.toml @your-github-username
-.pre-commit-config.yaml @your-github-username
+pyproject.toml @DronPascal
+.pre-commit-config.yaml @DronPascal

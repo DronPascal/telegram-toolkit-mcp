@@ -6,15 +6,15 @@ MCP-compliant error responses for the Telegram integration.
 """
 
 import asyncio
-import time
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Dict, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class TelegramMCPErrors:
@@ -68,9 +68,9 @@ class TelegramMCPException(Exception):
         self,
         code: str,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
-        retry_after: Optional[int] = None,
-        cause: Optional[Exception] = None
+        details: dict[str, Any] | None = None,
+        retry_after: int | None = None,
+        cause: Exception | None = None,
     ):
         """
         Initialize MCP exception.
@@ -89,7 +89,7 @@ class TelegramMCPException(Exception):
         self.retry_after = retry_after
         self.cause = cause
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert exception to dictionary for MCP response.
 
@@ -116,48 +116,48 @@ class TelegramMCPException(Exception):
 class FloodWaitException(TelegramMCPException):
     """Exception for Telegram FLOOD_WAIT errors."""
 
-    def __init__(self, retry_after: int, cause: Optional[Exception] = None):
+    def __init__(self, retry_after: int, cause: Exception | None = None):
         super().__init__(
             code=TelegramMCPErrors.FLOOD_WAIT,
             message=f"Rate limit exceeded. Wait {retry_after} seconds before retry.",
             retry_after=retry_after,
-            cause=cause
+            cause=cause,
         )
 
 
 class ChannelPrivateException(TelegramMCPException):
     """Exception for private/unaccessible channels."""
 
-    def __init__(self, chat_id: Union[str, int], cause: Optional[Exception] = None):
+    def __init__(self, chat_id: str | int, cause: Exception | None = None):
         super().__init__(
             code=TelegramMCPErrors.CHANNEL_PRIVATE,
             message=f"Channel {chat_id} is private or inaccessible",
             details={"chat_id": str(chat_id)},
-            cause=cause
+            cause=cause,
         )
 
 
 class ChatNotFoundException(TelegramMCPException):
     """Exception for non-existent chats."""
 
-    def __init__(self, chat_id: Union[str, int], cause: Optional[Exception] = None):
+    def __init__(self, chat_id: str | int, cause: Exception | None = None):
         super().__init__(
             code=TelegramMCPErrors.CHAT_NOT_FOUND,
             message=f"Chat {chat_id} not found",
             details={"chat_id": str(chat_id)},
-            cause=cause
+            cause=cause,
         )
 
 
 class ValidationException(TelegramMCPException):
     """Exception for input validation errors."""
 
-    def __init__(self, field: str, value: Any, reason: str, cause: Optional[Exception] = None):
+    def __init__(self, field: str, value: Any, reason: str, cause: Exception | None = None):
         super().__init__(
             code=TelegramMCPErrors.INPUT_VALIDATION,
             message=f"Invalid {field}: {reason}",
             details={"field": field, "value": str(value), "reason": reason},
-            cause=cause
+            cause=cause,
         )
 
 
@@ -178,7 +178,8 @@ def map_telethon_exception(exc: Exception) -> TelegramMCPException:
     if "flood" in exc_str.lower():
         # Extract retry time from flood wait message
         import re
-        match = re.search(r'wait (\d+)', exc_str, re.IGNORECASE)
+
+        match = re.search(r"wait (\d+)", exc_str, re.IGNORECASE)
         retry_after = int(match.group(1)) if match else 60
 
         return FloodWaitException(retry_after, exc)
@@ -190,25 +191,17 @@ def map_telethon_exception(exc: Exception) -> TelegramMCPException:
         return ChannelPrivateException("unknown", exc)
 
     elif "timeout" in exc_str.lower():
-        return TelegramMCPException(
-            TelegramMCPErrors.TIMEOUT_ERROR,
-            "Request timed out",
-            cause=exc
-        )
+        return TelegramMCPException(TelegramMCPErrors.TIMEOUT_ERROR, "Request timed out", cause=exc)
 
     elif "connection" in exc_str.lower():
         return TelegramMCPException(
-            TelegramMCPErrors.CONNECTION_ERROR,
-            "Connection error",
-            cause=exc
+            TelegramMCPErrors.CONNECTION_ERROR, "Connection error", cause=exc
         )
 
     # Generic mapping
     else:
         return TelegramMCPException(
-            TelegramMCPErrors.INTERNAL_ERROR,
-            f"Internal error: {exc_str}",
-            cause=exc
+            TelegramMCPErrors.INTERNAL_ERROR, f"Internal error: {exc_str}", cause=exc
         )
 
 
@@ -221,7 +214,7 @@ class RetryConfig:
         initial_delay: float = 1.0,
         max_delay: float = 60.0,
         backoff_factor: float = 2.0,
-        jitter: bool = True
+        jitter: bool = True,
     ):
         """
         Initialize retry configuration.
@@ -241,10 +234,7 @@ class RetryConfig:
 
 
 async def retry_with_backoff(
-    func: Callable[..., T],
-    retry_config: RetryConfig = None,
-    *args,
-    **kwargs
+    func: Callable[..., T], retry_config: RetryConfig = None, *args, **kwargs
 ) -> T:
     """
     Execute a function with exponential backoff retry logic.
@@ -278,7 +268,7 @@ async def retry_with_backoff(
                 logger.error(
                     "All retry attempts failed with flood wait",
                     attempts=retry_config.max_attempts,
-                    last_retry_after=e.retry_after
+                    last_retry_after=e.retry_after,
                 )
                 raise
 
@@ -288,7 +278,7 @@ async def retry_with_backoff(
                 f"Flood wait encountered, waiting {wait_time}s",
                 attempt=attempt + 1,
                 max_attempts=retry_config.max_attempts,
-                wait_time=wait_time
+                wait_time=wait_time,
             )
             await asyncio.sleep(wait_time)
 
@@ -300,19 +290,20 @@ async def retry_with_backoff(
                 logger.error(
                     "All retry attempts failed",
                     attempts=retry_config.max_attempts,
-                    last_error=str(e)
+                    last_error=str(e),
                 )
                 raise map_telethon_exception(e) from e
 
             # Calculate delay with exponential backoff
             delay = min(
-                retry_config.initial_delay * (retry_config.backoff_factor ** attempt),
-                retry_config.max_delay
+                retry_config.initial_delay * (retry_config.backoff_factor**attempt),
+                retry_config.max_delay,
             )
 
             if retry_config.jitter:
                 # Add random jitter (±25%)
                 import random
+
                 jitter_range = delay * 0.25
                 delay += random.uniform(-jitter_range, jitter_range)
 
@@ -321,7 +312,7 @@ async def retry_with_backoff(
                 attempt=attempt + 1,
                 max_attempts=retry_config.max_attempts,
                 delay=delay,
-                error=str(e)
+                error=str(e),
             )
 
             await asyncio.sleep(delay)
@@ -351,7 +342,7 @@ async def error_handler() -> AsyncGenerator[None, None]:
         raise map_telethon_exception(e) from e
 
 
-def create_error_response(error: TelegramMCPException) -> Dict[str, Any]:
+def create_error_response(error: TelegramMCPException) -> dict[str, Any]:
     """
     Create MCP-compliant error response.
 
@@ -364,20 +355,13 @@ def create_error_response(error: TelegramMCPException) -> Dict[str, Any]:
     return {
         "isError": True,
         "error": error.to_dict(),
-        "content": [
-            {
-                "type": "text",
-                "text": f"Error: {error.message}"
-            }
-        ]
+        "content": [{"type": "text", "text": f"Error: {error.message}"}],
     }
 
 
 def create_success_response(
-    content: Any = None,
-    structured_content: Any = None,
-    resources: Optional[list] = None
-) -> Dict[str, Any]:
+    content: Any = None, structured_content: Any = None, resources: list | None = None
+) -> dict[str, Any]:
     """
     Create MCP-compliant success response.
 

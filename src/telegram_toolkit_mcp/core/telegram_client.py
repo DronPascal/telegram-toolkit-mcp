@@ -5,9 +5,9 @@ This module provides a high-level interface for interacting with Telegram
 API through Telethon, with proper error handling and resource management.
 """
 
-import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from typing import Any
 
 from ..utils.logging import get_logger
 
@@ -55,7 +55,7 @@ class TelegramClientWrapper:
             self._client = client
 
             # Check if already connected
-            if hasattr(client, 'is_connected') and client.is_connected():
+            if hasattr(client, "is_connected") and client.is_connected():
                 self._is_connected = True
                 logger.info("Telegram client already connected")
                 return
@@ -83,7 +83,7 @@ class TelegramClientWrapper:
             except Exception as e:
                 logger.error("Error during disconnect", error=str(e))
 
-    async def get_chat_info(self, chat_identifier: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_identifier: str) -> dict[str, Any]:
         """
         Get information about a chat/channel.
 
@@ -97,10 +97,10 @@ class TelegramClientWrapper:
             logger.info("Getting chat info", chat=chat_identifier)
 
             # Resolve chat entity
-            if chat_identifier.startswith('@'):
+            if chat_identifier.startswith("@"):
                 chat_entity = await self.client.get_entity(chat_identifier)
-            elif chat_identifier.startswith('https://t.me/'):
-                username = chat_identifier.split('/')[-1]
+            elif chat_identifier.startswith("https://t.me/"):
+                username = chat_identifier.split("/")[-1]
                 chat_entity = await self.client.get_entity(f"@{username}")
             else:
                 # Try as numeric ID first, then as username
@@ -112,32 +112,29 @@ class TelegramClientWrapper:
 
             # Extract chat information
             chat_info = {
-                'id': chat_entity.id,
-                'title': getattr(chat_entity, 'title', None) or getattr(chat_entity, 'first_name', 'Unknown'),
-                'username': getattr(chat_entity, 'username', None),
-                'type': self._get_chat_type(chat_entity),
-                'participants_count': getattr(chat_entity, 'participants_count', None),
-                'verified': getattr(chat_entity, 'verified', False),
-                'restricted': getattr(chat_entity, 'restricted', False),
-                'megagroup': getattr(chat_entity, 'megagroup', False),
-                'gigagroup': getattr(chat_entity, 'gigagroup', False),
+                "id": chat_entity.id,
+                "title": getattr(chat_entity, "title", None)
+                or getattr(chat_entity, "first_name", "Unknown"),
+                "username": getattr(chat_entity, "username", None),
+                "type": self._get_chat_type(chat_entity),
+                "participants_count": getattr(chat_entity, "participants_count", None),
+                "verified": getattr(chat_entity, "verified", False),
+                "restricted": getattr(chat_entity, "restricted", False),
+                "megagroup": getattr(chat_entity, "megagroup", False),
+                "gigagroup": getattr(chat_entity, "gigagroup", False),
             }
 
             logger.info(
                 "Chat info retrieved",
                 chat=chat_identifier,
-                chat_id=chat_info['id'],
-                type=chat_info['type']
+                chat_id=chat_info["id"],
+                type=chat_info["type"],
             )
 
             return chat_info
 
         except Exception as e:
-            logger.error(
-                "Failed to get chat info",
-                chat=chat_identifier,
-                error=str(e)
-            )
+            logger.error("Failed to get chat info", chat=chat_identifier, error=str(e))
             raise
 
     def _get_chat_type(self, entity: Any) -> str:
@@ -152,33 +149,33 @@ class TelegramClientWrapper:
         """
         entity_type = str(type(entity).__name__).lower()
 
-        if 'user' in entity_type:
-            return 'user'
-        elif 'channel' in entity_type:
+        if "user" in entity_type:
+            return "user"
+        elif "channel" in entity_type:
             # Check if it's a broadcast channel or supergroup
-            if hasattr(entity, 'broadcast') and entity.broadcast:
-                return 'channel'
-            elif hasattr(entity, 'megagroup') and entity.megagroup:
-                return 'supergroup'
+            if hasattr(entity, "broadcast") and entity.broadcast:
+                return "channel"
+            elif hasattr(entity, "megagroup") and entity.megagroup:
+                return "supergroup"
             else:
-                return 'channel'
-        elif 'chat' in entity_type:
-            return 'group'
+                return "channel"
+        elif "chat" in entity_type:
+            return "group"
         else:
-            return 'unknown'
+            return "unknown"
 
     async def fetch_messages(
         self,
-        chat_id: Union[str, int],
+        chat_id: str | int,
         limit: int = 100,
-        offset_id: Optional[int] = None,
-        offset_date: Optional[int] = None,
-        min_id: Optional[int] = None,
-        max_id: Optional[int] = None,
-        search: Optional[str] = None,
-        from_user: Optional[str] = None,
-        **kwargs
-    ) -> List[Dict[str, Any]]:
+        offset_id: int | None = None,
+        offset_date: int | None = None,
+        min_id: int | None = None,
+        max_id: int | None = None,
+        search: str | None = None,
+        from_user: str | None = None,
+        **kwargs,
+    ) -> list[dict[str, Any]]:
         """
         Fetch messages from a chat with various filtering options.
 
@@ -198,21 +195,17 @@ class TelegramClientWrapper:
         """
         try:
             logger.info(
-                "Fetching messages",
-                chat=chat_id,
-                limit=limit,
-                search=search,
-                offset_id=offset_id
+                "Fetching messages", chat=chat_id, limit=limit, search=search, offset_id=offset_id
             )
 
             # Prepare fetch parameters
             fetch_kwargs = {
-                'limit': limit,
-                'offset_id': offset_id,
-                'offset_date': offset_date,
-                'min_id': min_id,
-                'max_id': max_id,
-                'search': search,
+                "limit": limit,
+                "offset_id": offset_id,
+                "offset_date": offset_date,
+                "min_id": min_id,
+                "max_id": max_id,
+                "search": search,
             }
 
             # Remove None values
@@ -235,21 +228,16 @@ class TelegramClientWrapper:
                 "Messages fetched successfully",
                 chat=chat_id,
                 count=len(messages),
-                requested_limit=limit
+                requested_limit=limit,
             )
 
             return messages
 
         except Exception as e:
-            logger.error(
-                "Failed to fetch messages",
-                chat=chat_id,
-                error=str(e),
-                limit=limit
-            )
+            logger.error("Failed to fetch messages", chat=chat_id, error=str(e), limit=limit)
             raise
 
-    def _convert_message_to_dict(self, message: Any) -> Dict[str, Any]:
+    def _convert_message_to_dict(self, message: Any) -> dict[str, Any]:
         """
         Convert a Telethon message object to a dictionary.
 
@@ -262,76 +250,78 @@ class TelegramClientWrapper:
         try:
             # Basic message info
             message_dict = {
-                'id': message.id,
-                'date': message.date.timestamp() if message.date else None,
-                'text': message.text or '',
-                'out': message.out,
-                'mentioned': message.mentioned,
-                'media_unread': message.media_unread,
-                'silent': message.silent,
-                'post': message.post,
-                'from_scheduled': message.from_scheduled,
-                'legacy': message.legacy,
-                'edit_hide': message.edit_hide,
-                'pinned': message.pinned,
-                'noforwards': message.noforwards,
+                "id": message.id,
+                "date": message.date.timestamp() if message.date else None,
+                "text": message.text or "",
+                "out": message.out,
+                "mentioned": message.mentioned,
+                "media_unread": message.media_unread,
+                "silent": message.silent,
+                "post": message.post,
+                "from_scheduled": message.from_scheduled,
+                "legacy": message.legacy,
+                "edit_hide": message.edit_hide,
+                "pinned": message.pinned,
+                "noforwards": message.noforwards,
             }
 
             # Sender information
             if message.sender:
-                message_dict['sender'] = {
-                    'id': message.sender.id,
-                    'first_name': getattr(message.sender, 'first_name', None),
-                    'last_name': getattr(message.sender, 'last_name', None),
-                    'username': getattr(message.sender, 'username', None),
-                    'bot': getattr(message.sender, 'bot', False),
-                    'verified': getattr(message.sender, 'verified', False),
+                message_dict["sender"] = {
+                    "id": message.sender.id,
+                    "first_name": getattr(message.sender, "first_name", None),
+                    "last_name": getattr(message.sender, "last_name", None),
+                    "username": getattr(message.sender, "username", None),
+                    "bot": getattr(message.sender, "bot", False),
+                    "verified": getattr(message.sender, "verified", False),
                 }
 
             # Message statistics
-            if hasattr(message, 'views') and message.views is not None:
-                message_dict['views'] = message.views
-            if hasattr(message, 'forwards') and message.forwards is not None:
-                message_dict['forwards'] = message.forwards
-            if hasattr(message, 'replies') and message.replies:
-                message_dict['replies'] = message.replies.replies if hasattr(message.replies, 'replies') else 0
+            if hasattr(message, "views") and message.views is not None:
+                message_dict["views"] = message.views
+            if hasattr(message, "forwards") and message.forwards is not None:
+                message_dict["forwards"] = message.forwards
+            if hasattr(message, "replies") and message.replies:
+                message_dict["replies"] = (
+                    message.replies.replies if hasattr(message.replies, "replies") else 0
+                )
 
             # Edit information
-            if hasattr(message, 'edit_date') and message.edit_date:
-                message_dict['edit_date'] = message.edit_date.timestamp()
+            if hasattr(message, "edit_date") and message.edit_date:
+                message_dict["edit_date"] = message.edit_date.timestamp()
 
             # Reply information
-            if message.reply_to and hasattr(message.reply_to, 'reply_to_msg_id'):
-                message_dict['reply_to_msg_id'] = message.reply_to.reply_to_msg_id
+            if message.reply_to and hasattr(message.reply_to, "reply_to_msg_id"):
+                message_dict["reply_to_msg_id"] = message.reply_to.reply_to_msg_id
 
             # Media information (basic)
             if message.media:
-                message_dict['has_media'] = True
-                message_dict['media_type'] = str(type(message.media).__name__)
+                message_dict["has_media"] = True
+                message_dict["media_type"] = str(type(message.media).__name__)
             else:
-                message_dict['has_media'] = False
+                message_dict["has_media"] = False
 
             # Additional attributes
-            if hasattr(message, 'grouped_id') and message.grouped_id:
-                message_dict['grouped_id'] = message.grouped_id
+            if hasattr(message, "grouped_id") and message.grouped_id:
+                message_dict["grouped_id"] = message.grouped_id
 
             return message_dict
 
         except Exception as e:
             logger.warning(
                 "Error converting message to dict",
-                message_id=getattr(message, 'id', 'unknown'),
-                error=str(e)
+                message_id=getattr(message, "id", "unknown"),
+                error=str(e),
             )
             # Return minimal information on error
             return {
-                'id': getattr(message, 'id', None),
-                'error': 'Failed to parse message',
-                'text': getattr(message, 'text', ''),
+                "id": getattr(message, "id", None),
+                "error": "Failed to parse message",
+                "text": getattr(message, "text", ""),
             }
 
     @asynccontextmanager
-    async def session_context(self) -> AsyncGenerator['TelegramClientWrapper', None]:
+    async def session_context(self) -> AsyncGenerator["TelegramClientWrapper", None]:
         """
         Context manager for client sessions.
 

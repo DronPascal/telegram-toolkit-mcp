@@ -12,9 +12,9 @@ updates:
       time: "08:00"
     open-pull-requests-limit: 10
     reviewers:
-      - "your-github-username"  # Replace with your GitHub username
+      - "DronPascal"  # Replace with your GitHub username
     assignees:
-      - "your-github-username"  # Replace with your GitHub username
+      - "DronPascal"  # Replace with your GitHub username
     commit-message:
       prefix: "deps"
       include: "scope"
@@ -39,9 +39,9 @@ updates:
       time: "08:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "your-github-username"
+      - "DronPascal"
     assignees:
-      - "your-github-username"
+      - "DronPascal"
     commit-message:
       prefix: "ci"
       include: "scope"

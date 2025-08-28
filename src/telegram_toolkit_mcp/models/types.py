@@ -100,7 +100,34 @@ class ChatInfo(BaseModel):
     chat_id: str = Field(..., description="Telegram chat identifier")
     kind: str = Field(..., description="Chat type", examples=["channel", "supergroup", "group"])
     title: str = Field(..., description="Chat title/name")
+    username: str | None = Field(None, description="Chat username (if available)")
     member_count: int | None = Field(None, ge=0, description="Member count")
+    verified: bool = Field(False, description="Whether chat is verified")
+    restricted: bool = Field(False, description="Whether chat is restricted")
+    megagroup: bool = Field(False, description="Whether it's a supergroup")
+    gigagroup: bool = Field(False, description="Whether it's a gigagroup")
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ResolveChatRequest(BaseModel):
+    """Request model for chat resolution."""
+
+    input: str = Field(..., description="Chat identifier to resolve")
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ResolveChatResponse(BaseModel):
+    """Response model for chat resolution."""
+
+    chat_id: str = Field(..., description="Resolved chat ID")
+    kind: str = Field(..., description="Chat type")
+    title: str = Field(..., description="Chat title")
+    username: str | None = Field(None, description="Chat username")
+    member_count: int | None = Field(None, description="Member count")
+    verified: bool = Field(False, description="Verification status")
+    resolved_from: Dict[str, str] = Field(..., description="Original input information")
 
     model_config = ConfigDict(frozen=True)
 
