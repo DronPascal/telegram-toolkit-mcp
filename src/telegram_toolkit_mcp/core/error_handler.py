@@ -234,7 +234,7 @@ class RetryConfig:
 
 
 async def retry_with_backoff(
-    func: Callable[..., T], retry_config: RetryConfig = None, *args, **kwargs
+    func: Callable[..., T], retry_config: Optional[RetryConfig] = None, *args, **kwargs
 ) -> T:
     """
     Execute a function with exponential backoff retry logic.
@@ -387,3 +387,133 @@ def create_success_response(
         response["resources"] = resources
 
     return response
+
+
+def retry_on_failure(
+    max_attempts: int = 3,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    retry_on: tuple = (FloodWaitException, Exception)
+):
+    """
+    Decorator for automatic retry with backoff.
+
+    Args:
+        max_attempts: Maximum number of retry attempts
+        initial_delay: Initial delay between retries
+        backoff_factor: Exponential backoff factor
+        retry_on: Exception types to retry on
+
+    Returns:
+        Decorated function
+    """
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            retry_config = RetryConfig(
+                max_attempts=max_attempts,
+                initial_delay=initial_delay,
+                backoff_factor=backoff_factor
+            )
+
+            return await retry_with_backoff(
+                func,
+                retry_config=retry_config,
+                *args,
+                **kwargs
+            )
+        return wrapper
+    return decorator
+
+
+class ErrorTracker:
+    """
+    Error tracking and statistics for monitoring.
+
+    Tracks error patterns and provides insights for debugging.
+    """
+
+    def __init__(self):
+        self.error_counts = defaultdict(int)
+        self.recent_errors = []
+        self.max_recent_errors = 100
+
+    def track_error(self, error: Exception, context: Optional[Dict[str, Any]] = None):
+        """
+        Track an error occurrence.
+
+        Args:
+            error: The exception that occurred
+            context: Additional context information
+        """
+        error_type = type(error).__name__
+        self.error_counts[error_type] += 1
+
+        # Store recent error with context
+        error_info = {
+            "type": error_type,
+            "message": str(error),
+            "timestamp": datetime.utcnow().isoformat(),
+            "context": context or {}
+        }
+
+        self.recent_errors.append(error_info)
+
+        # Keep only recent errors
+        if len(self.recent_errors) > self.max_recent_errors:
+            self.recent_errors.pop(0)
+
+    def get_error_stats(self) -> Dict[str, Any]:
+        """
+        Get error statistics.
+
+        Returns:
+            Dict containing error statistics
+        """
+        return {
+            "error_counts": dict(self.error_counts),
+            "total_errors": sum(self.error_counts.values()),
+            "recent_errors": self.recent_errors[-10:],  # Last 10 errors
+            "unique_error_types": len(self.error_counts)
+        }
+
+    def should_alert(self, error_type: str, threshold: int = 10) -> bool:
+        """
+        Check if error rate should trigger an alert.
+
+        Args:
+            error_type: Type of error to check
+            threshold: Error count threshold
+
+        Returns:
+            bool: True if alert should be triggered
+        """
+        return self.error_counts.get(error_type, 0) >= threshold
+
+
+# Global error tracker instance
+_error_tracker = ErrorTracker()
+
+
+def get_error_tracker() -> ErrorTracker:
+    """Get global error tracker instance."""
+    return _error_tracker
+
+
+# Export main classes and functions
+__all__ = [
+    "TelegramMCPErrors",
+    "TelegramMCPException",
+    "FloodWaitException",
+    "ChannelPrivateException",
+    "ChatNotFoundException",
+    "ValidationException",
+    "map_telethon_exception",
+    "RetryConfig",
+    "retry_with_backoff",
+    "retry_on_failure",
+    "error_handler",
+    "ErrorTracker",
+    "get_error_tracker",
+    "create_error_response",
+    "create_success_response"
+]

@@ -24,7 +24,8 @@ from ..core.error_handler import (
     ChannelPrivateException,
     ValidationException,
     error_handler,
-    create_success_response
+    create_success_response,
+    get_error_tracker
 )
 from ..core.pagination import Paginator, PaginationCursor, decode_cursor
 from ..core.filtering import get_message_processor, DateRangeFilter
@@ -357,6 +358,7 @@ async def fetch_history_tool(
 
     except ValidationException as e:
         logger.warning("Input validation failed", error=e.message, chat=chat)
+        get_error_tracker().track_error(e, {"tool": "tg.fetch_history", "chat": chat})
         return {
             "isError": True,
             "error": e.to_dict(),
@@ -370,6 +372,7 @@ async def fetch_history_tool(
 
     except ChatNotFoundException as e:
         logger.warning("Chat not found", chat=chat, error=e.message)
+        get_error_tracker().track_error(e, {"tool": "tg.fetch_history", "chat": chat})
         return {
             "isError": True,
             "error": e.to_dict(),
@@ -383,6 +386,7 @@ async def fetch_history_tool(
 
     except ChannelPrivateException as e:
         logger.warning("Channel is private", chat=chat, error=e.message)
+        get_error_tracker().track_error(e, {"tool": "tg.fetch_history", "chat": chat})
         return {
             "isError": True,
             "error": e.to_dict(),
@@ -402,6 +406,12 @@ async def fetch_history_tool(
             from_date=from_date,
             to_date=to_date
         )
+        get_error_tracker().track_error(e, {
+            "tool": "tg.fetch_history",
+            "chat": chat,
+            "from_date": from_date,
+            "to_date": to_date
+        })
         return {
             "isError": True,
             "error": {
