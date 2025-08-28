@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from ..core.error_handler import retry_on_failure, FloodWaitException
+from ..core.tracing import traced_async, add_span_attribute, add_span_event
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -84,6 +85,10 @@ class TelegramClientWrapper:
             except Exception as e:
                 logger.error("Error during disconnect", error=str(e))
 
+    @traced_async(
+        name="telegram_client.get_chat_info",
+        attributes=lambda self, chat_identifier: {"chat.identifier": chat_identifier}
+    )
     @retry_on_failure(max_attempts=3, initial_delay=0.5, backoff_factor=1.5)
     async def get_chat_info(self, chat_identifier: str) -> dict[str, Any]:
         """
@@ -166,6 +171,15 @@ class TelegramClientWrapper:
         else:
             return "unknown"
 
+    @traced_async(
+        name="telegram_client.fetch_messages",
+        attributes=lambda self, chat_id, limit=100, **kwargs: {
+            "chat.id": str(chat_id),
+            "messages.limit": limit,
+            "messages.offset_id": kwargs.get("offset_id"),
+            "messages.has_search": kwargs.get("search") is not None,
+        }
+    )
     @retry_on_failure(max_attempts=3, initial_delay=1.0, backoff_factor=2.0)
     async def fetch_messages(
         self,

@@ -79,6 +79,24 @@ class ObservabilityConfig(BaseModel):
         default=True, description="Enable OpenTelemetry distributed tracing"
     )
     otlp_endpoint: str | None = Field(default=None, description="OTLP endpoint for trace export")
+    otlp_exporter: str = Field(
+        default="grpc", description="OTLP exporter type: 'grpc', 'http', or 'jaeger'"
+    )
+    service_name: str = Field(
+        default="telegram-toolkit-mcp", description="Service name for tracing"
+    )
+    service_version: str = Field(
+        default="1.0.0", description="Service version for tracing"
+    )
+    trace_sampling_rate: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Trace sampling rate (0.0-1.0)"
+    )
+    trace_max_attributes: int = Field(
+        default=128, ge=1, le=1000, description="Maximum number of attributes per span"
+    )
+    trace_max_events: int = Field(
+        default=128, ge=1, le=1000, description="Maximum number of events per span"
+    )
 
     model_config = {"frozen": True}
 

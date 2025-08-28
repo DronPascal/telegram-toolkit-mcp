@@ -30,6 +30,7 @@ from ..core.error_handler import (
 )
 from ..models.types import ResolveChatResponse
 from ..core.monitoring import record_tool_success, record_tool_error, MetricsTimer
+from ..core.tracing import trace_mcp_tool_call, trace_telegram_api_call, add_span_attribute, add_span_event
 from ..utils.security import get_rate_limiter, InputValidator, get_security_auditor
 from ..utils.logging import get_logger
 
@@ -157,9 +158,15 @@ async def resolve_chat_tool(
     Returns:
         Dict containing resolved chat information
     """
-    # Start metrics timer for the tool execution
-    with MetricsTimer('tool', 'tg.resolve_chat') as timer:
-        try:
+    # Start tracing for the MCP tool call
+    async with trace_mcp_tool_call("tg.resolve_chat", {"input": input}):
+        # Add span attributes
+        add_span_attribute("chat.input", input)
+        add_span_event("tool_started", {"tool": "tg.resolve_chat"})
+
+        # Start metrics timer for the tool execution
+        with MetricsTimer('tool', 'tg.resolve_chat') as timer:
+            try:
             # Rate limiting check
             rate_limiter = get_rate_limiter()
             allowed, wait_time = await rate_limiter.check_rate_limit(f"resolve_chat:{input}")
@@ -259,8 +266,14 @@ async def resolve_chat_tool(
         # Get chat information with FLOOD_WAIT handling
         try:
             with client_wrapper.session_context() as client:
-                chat_info = await client.get_chat_info(parsed['canonical'])
+                # Trace Telegram API call
+                async with trace_telegram_api_call("get_chat_info", {"chat": parsed['canonical']}):
+                    add_span_attribute("telegram.chat.canonical", parsed['canonical'])
+                    add_span_event("telegram_api_call_started", {"method": "get_chat_info"})
+                    chat_info = await client.get_chat_info(parsed['canonical'])
+                    add_span_event("telegram_api_call_completed", {"success": True})
         except FloodWaitException as e:
+            add_span_event("telegram_api_call_failed", {"error": "FLOOD_WAIT", "retry_after": e.retry_after})
             logger.warning(
                 "FLOOD_WAIT encountered during chat resolution",
                 input=input,

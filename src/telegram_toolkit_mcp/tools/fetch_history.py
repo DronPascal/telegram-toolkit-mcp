@@ -40,6 +40,13 @@ from ..core.monitoring import (
     record_ndjson_export,
     MetricsTimer
 )
+from ..core.tracing import (
+    trace_mcp_tool_call,
+    trace_telegram_api_call,
+    trace_resource_operation,
+    add_span_attribute,
+    add_span_event
+)
 from ..utils.security import (
     get_rate_limiter,
     InputValidator,
@@ -281,9 +288,32 @@ async def fetch_history_tool(
     Returns:
         Dict containing messages and pagination info
     """
-    # Start metrics timer for the tool execution
-    with MetricsTimer('tool', 'tg.fetch_history') as timer:
-        try:
+    # Prepare arguments for tracing
+    trace_args = {
+        "chat": chat,
+        "from_date": from_date,
+        "to_date": to_date,
+        "page_size": page_size,
+        "cursor": cursor,
+        "direction": direction,
+        "search": search,
+        "filter": filter
+    }
+
+    # Start tracing for the MCP tool call
+    async with trace_mcp_tool_call("tg.fetch_history", trace_args):
+        # Add span attributes
+        add_span_attribute("chat.identifier", chat)
+        add_span_attribute("page_size", page_size)
+        add_span_attribute("has_cursor", cursor is not None)
+        add_span_attribute("has_search", search is not None)
+        add_span_attribute("has_filter", filter is not None)
+        add_span_attribute("direction", direction)
+        add_span_event("tool_started", {"tool": "tg.fetch_history"})
+
+        # Start metrics timer for the tool execution
+        with MetricsTimer('tool', 'tg.fetch_history') as timer:
+            try:
             # Rate limiting check
             rate_limiter = get_rate_limiter()
             allowed, wait_time = await rate_limiter.check_rate_limit(f"fetch_history:{chat}")
@@ -423,8 +453,22 @@ async def fetch_history_tool(
         # Fetch messages with automatic FLOOD_WAIT handling
         try:
             with client_wrapper.session_context() as client:
-                messages = await client.fetch_messages(chat, **pagination_params)
+                # Trace Telegram API call
+                async with trace_telegram_api_call("fetch_messages", pagination_params):
+                    add_span_attribute("telegram.chat", chat)
+                    add_span_attribute("telegram.limit", pagination_params.get('limit', 0))
+                    add_span_attribute("telegram.offset_id", pagination_params.get('offset_id', 0))
+                    add_span_event("telegram_api_call_started", {"method": "fetch_messages"})
+                    messages = await client.fetch_messages(chat, **pagination_params)
+                    add_span_event("telegram_api_call_completed", {
+                        "success": True,
+                        "messages_count": len(messages) if messages else 0
+                    })
         except FloodWaitException as e:
+            add_span_event("telegram_api_call_failed", {
+                "error": "FLOOD_WAIT",
+                "retry_after": e.retry_after
+            })
             logger.warning(
                 "FLOOD_WAIT encountered during message fetch",
                 chat=chat,
@@ -507,17 +551,31 @@ async def fetch_history_tool(
         export_info = None
         if len(messages) > 100:  # Threshold for creating resource
             try:
-                resource_manager = get_resource_manager()
-                resource_info = await resource_manager.create_ndjson_resource(
-                    messages,
-                    metadata={
-                        "chat": chat,
-                        "from_date": from_date,
-                        "to_date": to_date,
-                        "direction": direction,
-                        "search": search
-                    }
-                )
+                # Trace resource creation
+                async with trace_resource_operation("create", "ndjson_export"):
+                    add_span_attribute("resource.messages_count", len(messages))
+                    add_span_attribute("resource.chat", chat)
+                    add_span_event("resource_creation_started", {
+                        "operation": "create_ndjson",
+                        "messages_count": len(messages)
+                    })
+
+                    resource_manager = get_resource_manager()
+                    resource_info = await resource_manager.create_ndjson_resource(
+                        messages,
+                        metadata={
+                            "chat": chat,
+                            "from_date": from_date,
+                            "to_date": to_date,
+                            "direction": direction,
+                            "search": search
+                        }
+                    )
+
+                    add_span_event("resource_creation_completed", {
+                        "success": True,
+                        "resource_id": resource_info.get("resource_id", "unknown")
+                    })
                 export_info = ExportInfo(
                     uri=resource_info["uri"],
                     format="ndjson"
@@ -533,6 +591,10 @@ async def fetch_history_tool(
                 )
 
             except Exception as e:
+                add_span_event("resource_creation_failed", {
+                    "error": str(e),
+                    "messages_count": len(messages)
+                })
                 logger.warning(
                     "Failed to create NDJSON resource, using inline data",
                     error=str(e)

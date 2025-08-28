@@ -21,6 +21,7 @@ except ImportError:
 from .utils.config import get_config, validate_telegram_credentials
 from .utils.logging import get_logger
 from .core.monitoring import init_metrics, get_metrics_collector
+from .core.tracing import init_tracing, shutdown_tracing, instrument_fastapi
 
 logger = get_logger(__name__)
 
@@ -148,6 +149,13 @@ class TelegramMCPServer:
 
         try:
             # Startup phase
+            # Initialize OpenTelemetry tracing
+            tracing_enabled = init_tracing()
+            if tracing_enabled:
+                logger.info("OpenTelemetry tracing initialized successfully")
+            else:
+                logger.info("OpenTelemetry tracing disabled or not available")
+
             await self.initialize_telegram_client()
             self.metrics_collector.update_active_connections(1)
             logger.info("Server startup complete")
@@ -161,6 +169,10 @@ class TelegramMCPServer:
             # Shutdown phase
             self.metrics_collector.update_active_connections(0)
             await self.shutdown_telegram_client()
+
+            # Shutdown tracing
+            shutdown_tracing()
+
             logger.info("Server shutdown complete")
 
     def create_mcp_server(self) -> FastMCP:
@@ -183,6 +195,10 @@ class TelegramMCPServer:
 
         # Register tools will be added here
         self._register_tools()
+
+        # Instrument FastAPI app for tracing
+        if hasattr(self.mcp_server, 'app'):
+            instrument_fastapi(self.mcp_server.app)
 
         logger.info("MCP server created and configured")
         return self.mcp_server
