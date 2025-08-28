@@ -27,6 +27,7 @@ from ..core.error_handler import (
     create_success_response
 )
 from ..core.pagination import Paginator, PaginationCursor, decode_cursor
+from ..core.filtering import get_message_processor, DateRangeFilter
 from ..models.types import MessageInfo, PageInfo, ExportInfo
 from ..utils.logging import get_logger
 
@@ -45,34 +46,28 @@ class MessageHistoryFetcher:
     DEFAULT_PAGE_SIZE = 50  # Default messages per page
 
     @staticmethod
-    def validate_date_range(from_date: Optional[str], to_date: Optional[str]) -> None:
+    def validate_date_range(from_date: Optional[str], to_date: Optional[str]) -> Tuple[Optional[datetime], Optional[datetime]]:
         """
-        Validate date range parameters.
+        Validate and parse date range parameters.
 
         Args:
             from_date: Start date in ISO format (optional)
             to_date: End date in ISO format (optional)
 
+        Returns:
+            Tuple of (from_datetime, to_datetime)
+
         Raises:
             ValidationException: If date range is invalid
         """
-        if from_date and to_date:
-            try:
-                from_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-                to_dt = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
-
-                if from_dt >= to_dt:
-                    raise ValidationException(
-                        field="date_range",
-                        value=f"{from_date} to {to_date}",
-                        reason="from_date must be before to_date"
-                    )
-            except ValueError as e:
-                raise ValidationException(
-                    field="date_range",
-                    value=f"{from_date} to {to_date}",
-                    reason=f"Invalid date format: {e}"
-                )
+        try:
+            return DateRangeFilter.validate_date_range(from_date, to_date)
+        except ValueError as e:
+            raise ValidationException(
+                field="date_range",
+                value=f"{from_date} to {to_date}",
+                reason=str(e)
+            )
 
     @staticmethod
     def validate_page_size(page_size: int) -> int:
@@ -244,8 +239,8 @@ async def fetch_history_tool(
             search=search
         )
 
-        # Validate inputs
-        MessageHistoryFetcher.validate_date_range(from_date, to_date)
+        # Validate inputs and parse dates
+        from_dt, to_dt = MessageHistoryFetcher.validate_date_range(from_date, to_date)
 
         # Initialize paginator
         paginator = Paginator(chat)
@@ -301,13 +296,15 @@ async def fetch_history_tool(
         with client_wrapper.session_context() as client:
             messages = await client.fetch_messages(chat, **pagination_params)
 
-        # Post-process messages (date filtering, etc.)
-        if to_date:
-            to_dt = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
-            messages = [
-                msg for msg in messages
-                if msg.get('date') and datetime.fromtimestamp(msg['date']) <= to_dt
-            ]
+        # Apply server-side filtering and processing
+        processor = get_message_processor()
+        messages = processor.process_messages(
+            messages,
+            from_date=from_date,
+            to_date=to_date,
+            search_query=search,
+            deduplicate=True
+        )
 
         # Determine if there are more messages
         has_more = paginator.should_continue_pagination(
