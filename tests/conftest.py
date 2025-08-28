@@ -6,6 +6,7 @@ import asyncio
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import Mock, AsyncMock, MagicMock
 
 import pytest
 from dotenv import load_dotenv
@@ -103,6 +104,153 @@ async def mock_telegram_client():
     return MockClient()
 
 
+# Additional test fixtures
+@pytest.fixture
+def mock_prometheus_registry():
+    """Fixture for Prometheus registry in tests."""
+    from prometheus_client import CollectorRegistry
+    return CollectorRegistry()
+
+
+@pytest.fixture
+def mock_metrics_collector(mock_prometheus_registry):
+    """Fixture for metrics collector with test registry."""
+    from src.telegram_toolkit_mcp.core.monitoring import MetricsCollector
+    return MetricsCollector(registry=mock_prometheus_registry)
+
+
+@pytest.fixture
+def mock_security_context():
+    """Fixture for security testing context."""
+    return {
+        "client_ip": "192.168.1.100",
+        "user_agent": "TestClient/1.0",
+        "request_id": "test-request-123",
+        "session_id": "test-session-456"
+    }
+
+
+@pytest.fixture
+def mock_cursor():
+    """Fixture for mock pagination cursor."""
+    return {
+        "offset_id": 12345,
+        "offset_date": 1640995200,
+        "min_id": None,
+        "max_id": None,
+        "fetched_count": 50,
+        "direction": "desc"
+    }
+
+
+@pytest.fixture
+def mock_filter_params():
+    """Fixture for mock filter parameters."""
+    return {
+        "media_types": ["photo", "video"],
+        "has_media": True,
+        "from_users": [67890, 67891],
+        "min_views": 10,
+        "max_views": 1000
+    }
+
+
+@pytest.fixture
+def sample_messages():
+    """Fixture providing a list of sample message dictionaries."""
+    base_time = 1640995200.0  # 2022-01-01 00:00:00 UTC
+
+    return [
+        {
+            "id": 12340 + i,
+            "date": base_time + (i * 3600),  # One hour apart
+            "text": f"Test message {i}",
+            "out": False,
+            "mentioned": False,
+            "media_unread": False,
+            "silent": False,
+            "post": False,
+            "from_scheduled": False,
+            "legacy": False,
+            "edit_hide": False,
+            "pinned": False,
+            "noforwards": False,
+            "sender": {
+                "id": 67890 + i,
+                "first_name": f"User{i}",
+                "last_name": "Test",
+                "username": f"user{i}",
+                "bot": False,
+                "verified": False
+            },
+            "views": 10 + i * 5,
+            "forwards": i,
+            "has_media": i % 3 == 0,  # Every third message has media
+            "media_type": "photo" if i % 3 == 0 else None
+        }
+        for i in range(10)
+    ]
+
+
+@pytest.fixture
+def mock_telethon_message():
+    """Fixture for mocked Telethon message object."""
+    message = MagicMock()
+
+    # Basic message attributes
+    message.id = 12345
+    message.date.timestamp.return_value = 1640995200.0  # 2022-01-01 00:00:00 UTC
+    message.text = "Test message content"
+    message.out = False
+    message.mentioned = False
+    message.media_unread = False
+    message.silent = False
+    message.post = False
+    message.from_scheduled = False
+    message.legacy = False
+    message.edit_hide = False
+    message.pinned = False
+    message.noforwards = False
+
+    # Mock sender
+    sender = MagicMock()
+    sender.id = 67890
+    sender.first_name = "Test"
+    sender.last_name = "User"
+    sender.username = "testuser"
+    sender.bot = False
+    sender.verified = False
+    message.sender = sender
+
+    # Mock views and forwards
+    message.views = 42
+    message.forwards = 5
+
+    # Mock media
+    message.media = None
+
+    return message
+
+
+@pytest.fixture
+def mock_telethon_channel():
+    """Fixture for mocked Telethon channel entity."""
+    channel = MagicMock()
+
+    # Basic channel attributes
+    channel.id = 123456789
+    channel.title = "Test Channel"
+    channel.username = "testchannel"
+    channel.participants_count = 1000
+    channel.verified = True
+    channel.restricted = False
+    channel.megagroup = False
+    channel.gigagroup = False
+    channel.broadcast = True  # This is a broadcast channel
+
+    return channel
+
+
 # Test markers
 def pytest_configure(config):
     """Configure pytest with custom markers."""
@@ -113,6 +261,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "e2e: End-to-end tests requiring real Telegram API access")
     config.addinivalue_line("markers", "slow: Tests that take significant time to run")
     config.addinivalue_line("markers", "telegram: Tests that interact with Telegram API")
+    config.addinivalue_line("markers", "security: Security-related tests")
+    config.addinivalue_line("markers", "metrics: Metrics-related tests")
+    config.addinivalue_line("markers", "rate_limit: Rate limiting tests")
 
 
 # Test data fixtures
