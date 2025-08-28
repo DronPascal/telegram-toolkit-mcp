@@ -12,7 +12,7 @@ on:
 jobs:
   dependabot:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'your-org' # Replace with your GitHub org/username
+    if: github.repository_owner == 'DronPascal' # Replace with your GitHub org/username
 
     steps:
     - name: Check for dependency updates

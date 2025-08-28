@@ -26,6 +26,7 @@ from ..core.error_handler import (
     error_handler,
     create_success_response
 )
+from ..core.pagination import Paginator, PaginationCursor, decode_cursor
 from ..models.types import MessageInfo, PageInfo, ExportInfo
 from ..utils.logging import get_logger
 
@@ -158,7 +159,7 @@ class MessageHistoryFetcher:
 
 @Tool(
     name="tg.fetch_history",
-    description="Fetch message history from Telegram chats",
+    description="Fetch message history from Telegram chats with cursor-based pagination",
     inputSchema={
         "type": "object",
         "required": ["chat"],
@@ -184,6 +185,16 @@ class MessageHistoryFetcher:
                 "default": 50,
                 "description": "Number of messages per page"
             },
+            "cursor": {
+                "type": "string",
+                "description": "Base64-encoded cursor for pagination"
+            },
+            "direction": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "default": "desc",
+                "description": "Sort direction: 'asc' for oldest first, 'desc' for newest first"
+            },
             "search": {
                 "type": "string",
                 "description": "Search query to filter messages"
@@ -197,20 +208,24 @@ async def fetch_history_tool(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     page_size: int = 50,
+    cursor: Optional[str] = None,
+    direction: str = "desc",
     search: Optional[str] = None,
     ctx: Context = None
 ) -> Dict:
     """
-    MCP Tool: Fetch message history from Telegram chats.
+    MCP Tool: Fetch message history from Telegram chats with cursor-based pagination.
 
     This tool retrieves message history from public Telegram chats
-    with support for date filtering, pagination, and search.
+    with support for date filtering, cursor-based pagination, and search.
 
     Args:
         chat: Chat identifier (@username, t.me URL, or numeric ID)
         from_date: Start date for message range (ISO 8601)
         to_date: End date for message range (ISO 8601)
         page_size: Number of messages per page (max 100)
+        cursor: Base64-encoded cursor for pagination
+        direction: Sort direction ("asc" or "desc")
         search: Search query to filter messages
         ctx: MCP context (optional)
 
@@ -224,12 +239,29 @@ async def fetch_history_tool(
             from_date=from_date,
             to_date=to_date,
             page_size=page_size,
+            cursor=cursor,
+            direction=direction,
             search=search
         )
 
         # Validate inputs
         MessageHistoryFetcher.validate_date_range(from_date, to_date)
-        validated_page_size = MessageHistoryFetcher.validate_page_size(page_size)
+
+        # Initialize paginator
+        paginator = Paginator(chat)
+
+        # Validate page size
+        validated_page_size = paginator.validate_page_size(page_size)
+
+        # Decode cursor if provided
+        current_cursor = paginator.decode_cursor(cursor)
+        if current_cursor and current_cursor.direction != direction:
+            logger.warning(
+                "Cursor direction mismatch, using cursor direction",
+                cursor_direction=current_cursor.direction,
+                requested_direction=direction
+            )
+            direction = current_cursor.direction
 
         # Get MCP server from context to access Telegram client
         if ctx is None:
@@ -246,28 +278,28 @@ async def fetch_history_tool(
         # Wrap client for high-level operations
         client_wrapper = TelegramClientWrapper(telegram_client)
 
-        # Prepare fetch parameters
-        fetch_kwargs = {
-            'limit': validated_page_size,
-        }
+        # Get pagination parameters
+        if current_cursor is None:
+            current_cursor = paginator.create_initial_cursor(direction)
 
-        # Add date filtering
-        if from_date:
-            from_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-            fetch_kwargs['offset_date'] = from_dt
-
-        if to_date:
-            # Note: Telethon doesn't directly support end date filtering
-            # This will be handled in post-processing
-            pass
+        pagination_params = paginator.get_pagination_params(
+            current_cursor, validated_page_size, direction
+        )
 
         # Add search if provided
         if search:
-            fetch_kwargs['search'] = search
+            pagination_params['search'] = search
+
+        # Add initial date filtering if no cursor and dates provided
+        if not cursor:  # Only for first page
+            if from_date:
+                from_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                if 'offset_date' not in pagination_params:
+                    pagination_params['offset_date'] = from_dt
 
         # Fetch messages
         with client_wrapper.session_context() as client:
-            messages = await client.fetch_messages(chat, **fetch_kwargs)
+            messages = await client.fetch_messages(chat, **pagination_params)
 
         # Post-process messages (date filtering, etc.)
         if to_date:
@@ -277,27 +309,50 @@ async def fetch_history_tool(
                 if msg.get('date') and datetime.fromtimestamp(msg['date']) <= to_dt
             ]
 
-        # Check if there might be more messages
-        has_more = len(messages) == validated_page_size
+        # Determine if there are more messages
+        has_more = paginator.should_continue_pagination(
+            messages, validated_page_size, current_cursor.fetched_count + len(messages)
+        )
+
+        # Create next cursor if there are more messages
+        next_cursor = None
+        if has_more and messages:
+            next_cursor = current_cursor.get_next_cursor(messages[-1])
+            next_cursor.fetched_count = current_cursor.fetched_count + len(messages)
 
         # Format response
         response_data = MessageHistoryFetcher.format_messages_for_response(
             messages, validated_page_size, has_more
         )
 
+        # Update page info with cursor
+        if next_cursor:
+            response_data["page_info"]["cursor"] = next_cursor.encode()
+        else:
+            response_data["page_info"]["cursor"] = None
+
         logger.info(
             "Message history fetched successfully",
             chat=chat,
             message_count=len(messages),
-            has_more=has_more
+            has_more=has_more,
+            total_fetched=current_cursor.fetched_count + len(messages),
+            cursor_provided=bool(cursor),
+            direction=direction
         )
 
         # Create MCP-compliant response
+        status_text = f"Fetched {len(messages)} messages from {chat}"
+        if has_more:
+            status_text += f" (cursor: {next_cursor.encode() if next_cursor else 'end'})"
+        else:
+            status_text += " (end of results)"
+
         return create_success_response(
             content=[
                 {
                     "type": "text",
-                    "text": f"Fetched {len(messages)} messages from {chat}"
+                    "text": status_text
                 }
             ],
             structured_content=response_data
