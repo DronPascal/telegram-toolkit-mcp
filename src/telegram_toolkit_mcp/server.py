@@ -20,6 +20,7 @@ except ImportError:
 
 from .utils.config import get_config, validate_telegram_credentials
 from .utils.logging import get_logger
+from .core.monitoring import init_metrics, get_metrics_collector
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,10 @@ class TelegramMCPServer:
 
         # Validate configuration on startup
         self._validate_configuration()
+
+        # Initialize metrics
+        self.metrics_collector = init_metrics()
+        logger.info("Metrics collector initialized")
 
     def _validate_configuration(self) -> None:
         """Validate server configuration and credentials."""
@@ -144,6 +149,7 @@ class TelegramMCPServer:
         try:
             # Startup phase
             await self.initialize_telegram_client()
+            self.metrics_collector.update_active_connections(1)
             logger.info("Server startup complete")
 
             yield
@@ -153,6 +159,7 @@ class TelegramMCPServer:
             raise
         finally:
             # Shutdown phase
+            self.metrics_collector.update_active_connections(0)
             await self.shutdown_telegram_client()
             logger.info("Server shutdown complete")
 
@@ -197,6 +204,9 @@ class TelegramMCPServer:
             # Register resource handlers
             self._register_resource_handlers()
 
+            # Add metrics endpoint
+            self._add_metrics_endpoint()
+
             logger.info("Successfully registered MCP tools and resources")
 
         except ImportError as e:
@@ -224,6 +234,29 @@ class TelegramMCPServer:
         except Exception as e:
             logger.error("Failed to register resource handlers", error=str(e))
             # Don't raise here - resources are optional
+
+    def _add_metrics_endpoint(self) -> None:
+        """Add HTTP endpoint for Prometheus metrics."""
+        if not self.mcp_server:
+            return
+
+        try:
+            # Add metrics endpoint using FastMCP's HTTP capabilities
+            # Note: This assumes FastMCP supports custom HTTP routes
+            # If not supported, metrics can be exposed via separate HTTP server
+
+            @self.mcp_server.app.get("/metrics")
+            async def metrics_endpoint():
+                """Prometheus metrics endpoint."""
+                metrics_data, content_type = self.metrics_collector.get_metrics_response()
+                from fastapi import Response
+                return Response(content=metrics_data, media_type=content_type)
+
+            logger.info("Metrics endpoint added at /metrics")
+
+        except Exception as e:
+            logger.warning("Failed to add metrics endpoint", error=str(e))
+            logger.info("Metrics available via get_metrics_collector().get_metrics()")
 
     async def run_server(self) -> None:
         """

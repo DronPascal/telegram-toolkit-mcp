@@ -32,6 +32,14 @@ from ..core.error_handler import (
 from ..core.pagination import Paginator, PaginationCursor, decode_cursor
 from ..core.filtering import get_message_processor, DateRangeFilter
 from ..core.ndjson_resources import get_resource_manager
+from ..core.monitoring import (
+    record_tool_success,
+    record_tool_error,
+    record_messages_fetched,
+    record_page_served,
+    record_ndjson_export,
+    MetricsTimer
+)
 from ..models.types import MessageInfo, PageInfo, ExportInfo
 from ..utils.logging import get_logger
 
@@ -268,18 +276,20 @@ async def fetch_history_tool(
     Returns:
         Dict containing messages and pagination info
     """
-    try:
-        logger.info(
-            "Fetching message history",
-            chat=chat,
-            from_date=from_date,
-            to_date=to_date,
-            page_size=page_size,
-            cursor=cursor,
-            direction=direction,
-            search=search,
-            filter=filter
-        )
+    # Start metrics timer for the tool execution
+    with MetricsTimer('tool', 'tg.fetch_history') as timer:
+        try:
+            logger.info(
+                "Fetching message history",
+                chat=chat,
+                from_date=from_date,
+                to_date=to_date,
+                page_size=page_size,
+                cursor=cursor,
+                direction=direction,
+                search=search,
+                filter=filter
+            )
 
         # Validate inputs and parse dates
         from_dt, to_dt = MessageHistoryFetcher.validate_date_range(from_date, to_date)
@@ -437,6 +447,9 @@ async def fetch_history_tool(
                     format="ndjson"
                 ).model_dump()
 
+                # Record NDJSON export metrics
+                record_ndjson_export("success")
+
                 logger.info(
                     "NDJSON resource created for large dataset",
                     resource_id=resource_info["resource_id"],
@@ -448,6 +461,7 @@ async def fetch_history_tool(
                     "Failed to create NDJSON resource, using inline data",
                     error=str(e)
                 )
+                record_ndjson_export("error")
 
         # Format response
         response_data = MessageHistoryFetcher.format_messages_for_response(
@@ -463,6 +477,11 @@ async def fetch_history_tool(
         # Add export info if available
         if export_info:
             response_data["export"] = export_info
+
+        # Record metrics for successful operation
+        has_filters = bool(search or media_types or from_users or min_views is not None or max_views is not None or from_date or to_date)
+        record_messages_fetched("tg.fetch_history", len(messages), has_filters)
+        record_page_served("tg.fetch_history", direction)
 
         logger.info(
             "Message history fetched successfully",

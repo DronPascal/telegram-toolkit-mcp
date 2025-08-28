@@ -29,6 +29,7 @@ from ..core.error_handler import (
     get_error_tracker
 )
 from ..models.types import ResolveChatResponse
+from ..core.monitoring import record_tool_success, record_tool_error, MetricsTimer
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -155,8 +156,10 @@ async def resolve_chat_tool(
     Returns:
         Dict containing resolved chat information
     """
-    try:
-        logger.info("Resolving chat identifier", input=input)
+    # Start metrics timer for the tool execution
+    with MetricsTimer('tool', 'tg.resolve_chat') as timer:
+        try:
+            logger.info("Resolving chat identifier", input=input)
 
         # Validate input
         if not input or not isinstance(input, str):
@@ -236,6 +239,9 @@ async def resolve_chat_tool(
                 "canonical": parsed['canonical']
             }
         }
+
+        # Record successful tool execution
+        record_tool_success("tg.resolve_chat", chat_type=response_data['kind'])
 
         logger.info(
             "Chat resolved successfully",

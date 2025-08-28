@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from typing import Any, TypeVar
 
 from ..utils.logging import get_logger
+from .monitoring import record_flood_wait_event, get_metrics_collector
 
 logger = get_logger(__name__)
 
@@ -280,6 +281,18 @@ async def retry_with_backoff(
                 max_attempts=retry_config.max_attempts,
                 wait_time=wait_time,
             )
+
+            # Record FLOOD_WAIT event in metrics
+            # Extract tool name from function name if available
+            tool_name = getattr(func, '__name__', 'unknown')
+            if hasattr(func, '__qualname__'):
+                # Extract tool name from qualname (e.g., 'resolve_chat_tool' from 'resolve_chat_tool.<locals>.wrapper')
+                qualname_parts = func.__qualname__.split('.')
+                if len(qualname_parts) > 1 and qualname_parts[-1] == 'wrapper':
+                    tool_name = qualname_parts[0]
+
+            record_flood_wait_event(tool_name, attempt + 1, wait_time)
+
             await asyncio.sleep(wait_time)
 
         except Exception as e:
