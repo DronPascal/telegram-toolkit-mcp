@@ -431,7 +431,7 @@ def retry_on_failure(
                 backoff_factor=backoff_factor,
             )
 
-            return await retry_with_backoff(func, retry_config=retry_config, *args, **kwargs)
+            return await retry_with_backoff(func, retry_config, *args, **kwargs)
 
         return wrapper
 

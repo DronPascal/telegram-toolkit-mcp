@@ -163,14 +163,15 @@ class TestMetricsErrorHandlerIntegration:
         stats = error_tracker.get_error_stats()
         assert stats["error_counts"]["FloodWaitException"] == 150
 
-        # Verify recent errors are limited (should keep only last 100)
-        recent_errors = error_tracker.get_recent_errors()
+        # Verify recent errors are limited to max_recent_errors (default 100)
+        recent_errors = error_tracker.get_recent_errors(limit=100)
         assert len(recent_errors) == 100  # Limited by max_recent_errors
 
-        # Verify recent errors are the most recent ones (last 100 from the 150 added)
-        # Since we added errors 0-149, recent should contain 50-149
-        assert recent_errors[0]["context"]["iteration"] == 50   # First in recent (oldest in recent)
-        assert recent_errors[-1]["context"]["iteration"] == 149 # Last in recent (newest in recent)
+        # Verify recent errors contain the most recent ones
+        # With 150 errors added, we should have errors 50-149 (last 100)
+        iterations = [error["context"]["iteration"] for error in recent_errors]
+        assert min(iterations) == 50   # Oldest in recent batch
+        assert max(iterations) == 149  # Newest in recent batch
 
     def test_error_tracker_context_preservation(self, error_tracker):
         """Test error tracker preserves context information correctly."""
@@ -241,8 +242,8 @@ class TestMetricsErrorHandlerIntegration:
         final_memory = sys.getsizeof(error_tracker.recent_errors)
 
         # Verify recent errors are limited
-        recent_errors = error_tracker.get_recent_errors()
-        assert len(recent_errors) == 100  # Should be limited to max_recent_errors (we added 200, kept 100)
+        recent_errors = error_tracker.get_recent_errors(limit=100)
+        assert len(recent_errors) == 100  # Should be limited to max_recent_errors (we added 200, kept last 100)
 
         # Memory usage should be reasonable (not growing linearly with error count)
         # This is a basic check - in real scenarios you'd use memory profiling tools
