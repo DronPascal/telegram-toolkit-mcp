@@ -6,6 +6,7 @@ Telegram API responses, and internal data structures.
 """
 
 from datetime import datetime
+from typing import Dict
 
 try:
     from pydantic import BaseModel, ConfigDict, Field

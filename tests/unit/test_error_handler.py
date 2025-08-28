@@ -299,7 +299,7 @@ class TestErrorHandlerIntegration:
     def test_error_tracker_with_metrics(self, error_tracker):
         """Test error tracker integration with metrics."""
         with patch(
-            "src.telegram_toolkit_mcp.core.error_handler.get_metrics_collector"
+            "src.telegram_toolkit_mcp.core.monitoring.get_metrics_collector"
         ) as mock_get_metrics:
             mock_metrics = Mock()
             mock_get_metrics.return_value = mock_metrics
@@ -307,8 +307,8 @@ class TestErrorHandlerIntegration:
             error = FloodWaitException(retry_after=30)
             error_tracker.track_error(error, {"tool": "test_tool"})
 
-            # Should record error in metrics
-            mock_metrics.record_error.assert_called_once_with("FloodWaitException", "error_handler")
+            # Should record flood wait event in metrics
+            mock_metrics.record_flood_wait.assert_called_once_with("test_tool", 1, 30)
 
     def test_flood_wait_retry_with_metrics(self):
         """Test FLOOD_WAIT retry integration with metrics."""

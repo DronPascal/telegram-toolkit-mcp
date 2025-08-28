@@ -478,6 +478,12 @@ class ErrorTracker:
         if len(self.recent_errors) > self.max_recent_errors:
             self.recent_errors.pop(0)
 
+        # Record flood wait events in metrics if it's a FloodWaitException
+        if isinstance(error, FloodWaitException):
+            from .monitoring import record_flood_wait_event
+            tool = context.get("tool", "unknown") if context else "unknown"
+            record_flood_wait_event(tool, 1, error.retry_after)
+
     def get_error_stats(self) -> dict[str, Any]:
         """
         Get error statistics.

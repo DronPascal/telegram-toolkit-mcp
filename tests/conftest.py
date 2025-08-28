@@ -31,6 +31,13 @@ def temp_dir() -> Generator[Path, None, None]:
         yield Path(temp_dir)
 
 
+@pytest.fixture
+def error_tracker():
+    """Error tracker fixture for tests."""
+    from src.telegram_toolkit_mcp.core.error_handler import ErrorTracker
+    return ErrorTracker()
+
+
 @pytest.fixture(scope="session")
 def test_config():
     """Test configuration fixture."""
