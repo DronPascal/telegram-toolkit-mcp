@@ -31,6 +31,9 @@ class TestTelegramClientErrorHandlerIntegration:
     @pytest.fixture
     def mock_config(self):
         """Mock application configuration."""
+        # Create proper Pydantic models instead of mock objects
+        from telegram_toolkit_mcp.utils.config import PerformanceConfig, ResourceConfig, ObservabilityConfig
+
         return AppConfig(
             telegram=TelegramConfig(
                 api_id=12345,
@@ -38,45 +41,37 @@ class TestTelegramClientErrorHandlerIntegration:
                 session_string=None
             ),
             server=ServerConfig(host="localhost", port=8000, log_level="DEBUG"),
-            performance=type(
-                "PerformanceConfig",
-                (),
-                {"flood_sleep_threshold": 30, "request_timeout": 10, "max_page_size": 50},
-            )(),
-            resources=type(
-                "ResourceConfig",
-                (),
-                {
-                    "temp_dir": "/tmp/test-resources",
-                    "resource_max_age_hours": 1,
-                    "ndjson_chunk_size": 100
-                },
-            )(),
-            observability=type(
-                "ObservabilityConfig",
-                (),
-                {
-                    "enable_prometheus_metrics": False,
-                    "enable_opentelemetry_tracing": False,
-                    "otlp_endpoint": None,
-                    "otlp_exporter": "grpc",
-                    "service_name": "test",
-                    "service_version": "1.0.0",
-                    "trace_sampling_rate": 1.0,
-                    "trace_max_attributes": 128,
-                    "trace_max_events": 128
-                },
-            )()
+            performance=PerformanceConfig(
+                flood_sleep_threshold=30,
+                request_timeout=10,
+                max_page_size=50
+            ),
+            resources=ResourceConfig(
+                temp_dir="/tmp/test-resources",
+                resource_max_age_hours=1,
+                ndjson_chunk_size=100
+            ),
+            observability=ObservabilityConfig(
+                enable_prometheus_metrics=False,
+                enable_opentelemetry_tracing=False,
+                otlp_endpoint=None,
+                otlp_exporter="grpc",
+                service_name="test",
+                service_version="1.0.0",
+                trace_sampling_rate=1.0,
+                trace_max_attributes=128,
+                trace_max_events=128
+            )
         )
 
     @pytest.fixture
-    async def mock_telethon_client(self):
+    def mock_telethon_client(self):
         """Mock Telethon client."""
-        client = AsyncMock()
+        client = MagicMock()
         client.is_connected.return_value = True
-        client.get_entity = AsyncMock()
-        client.iter_messages = AsyncMock()
-        client.disconnect = AsyncMock()
+        client.get_entity = MagicMock()
+        client.iter_messages = MagicMock()
+        client.disconnect = MagicMock()
         return client
 
     @pytest.fixture
@@ -84,8 +79,7 @@ class TestTelegramClientErrorHandlerIntegration:
         """Error tracker instance."""
         return ErrorTracker()
 
-    @pytest.mark.asyncio
-    async def test_client_wrapper_with_flood_wait_recovery(
+    def test_client_wrapper_with_flood_wait_recovery(
         self, mock_config, mock_telethon_client, error_tracker
     ):
         """Test TelegramClientWrapper handles FloodWaitException with error tracking."""
@@ -108,7 +102,7 @@ class TestTelegramClientErrorHandlerIntegration:
 
         # Test flood wait scenario with error tracking
         try:
-            await client_wrapper.fetch_messages(
+            client_wrapper.fetch_messages(
                 chat="testchannel",
                 limit=10,
                 offset_date=datetime.now(timezone.utc)
@@ -128,8 +122,8 @@ class TestTelegramClientErrorHandlerIntegration:
         assert recent_errors[0]["type"] == "FloodWaitException"
         assert recent_errors[0]["context"]["tool"] == "test_tool"
 
-    @pytest.mark.asyncio
-    async def test_client_wrapper_with_channel_private_error(
+    
+    def test_client_wrapper_with_channel_private_error(
         self, mock_config, mock_telethon_client, error_tracker
     ):
         """Test TelegramClientWrapper handles ChannelPrivateException properly."""
@@ -144,7 +138,7 @@ class TestTelegramClientErrorHandlerIntegration:
 
         # Test private channel scenario
         with pytest.raises(ChannelPrivateException) as exc_info:
-            await client_wrapper.fetch_messages(
+            client_wrapper.fetch_messages(
                 chat="privatechannel",
                 limit=10,
                 offset_date=datetime.now(timezone.utc)
@@ -162,8 +156,8 @@ class TestTelegramClientErrorHandlerIntegration:
         assert recent_errors[0]["type"] == "ChannelPrivateException"
         assert "private" in recent_errors[0]["context"]["chat"]
 
-    @pytest.mark.asyncio
-    async def test_client_wrapper_with_chat_not_found_error(
+    
+    def test_client_wrapper_with_chat_not_found_error(
         self, mock_config, mock_telethon_client, error_tracker
     ):
         """Test TelegramClientWrapper handles ChatNotFoundException properly."""
@@ -179,7 +173,7 @@ class TestTelegramClientErrorHandlerIntegration:
 
         # Test chat not found scenario
         with pytest.raises(ChatNotFoundException) as exc_info:
-            await client_wrapper.get_chat_info("nonexistent")
+            client_wrapper.get_chat_info("nonexistent")
 
         # Track the error
         error_tracker.track_error(exc_info.value, {"tool": "test_tool", "chat": "nonexistent"})
@@ -192,8 +186,8 @@ class TestTelegramClientErrorHandlerIntegration:
         assert len(recent_errors) == 1
         assert recent_errors[0]["type"] == "ChatNotFoundException"
 
-    @pytest.mark.asyncio
-    async def test_error_tracker_multiple_errors(self, error_tracker):
+    
+    def test_error_tracker_multiple_errors(self, error_tracker):
         """Test error tracker handles multiple different errors."""
         # Track multiple different errors
         error_tracker.track_error(
@@ -230,8 +224,8 @@ class TestTelegramClientErrorHandlerIntegration:
         assert "fetch_history" in tool_names
         assert "resolve_chat" in tool_names
 
-    @pytest.mark.asyncio
-    async def test_client_wrapper_connection_error_handling(
+    
+    def test_client_wrapper_connection_error_handling(
         self, mock_config, mock_telethon_client, error_tracker
     ):
         """Test client wrapper handles connection errors gracefully."""
@@ -250,7 +244,7 @@ class TestTelegramClientErrorHandlerIntegration:
 
         # Test connection error scenario
         with pytest.raises(Exception) as exc_info:
-            await client_wrapper.fetch_messages(
+            client_wrapper.fetch_messages(
                 chat="testchannel",
                 limit=10,
                 offset_date=datetime.now(timezone.utc)

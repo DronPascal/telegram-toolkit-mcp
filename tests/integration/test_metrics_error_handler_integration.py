@@ -159,7 +159,7 @@ class TestMetricsErrorHandlerIntegration:
                 "iteration": i
             })
 
-        # Verify error counts are correct
+        # Verify error counts are correct (all errors are tracked regardless of limit)
         stats = error_tracker.get_error_stats()
         assert stats["error_counts"]["FloodWaitException"] == 150
 
@@ -168,6 +168,7 @@ class TestMetricsErrorHandlerIntegration:
         assert len(recent_errors) == 100  # Limited by max_recent_errors
 
         # Verify recent errors are the most recent ones (last 100 from the 150 added)
+        # Since we added errors 0-149, recent should contain 50-149
         assert recent_errors[0]["context"]["iteration"] == 50   # First in recent (oldest in recent)
         assert recent_errors[-1]["context"]["iteration"] == 149 # Last in recent (newest in recent)
 
@@ -241,7 +242,7 @@ class TestMetricsErrorHandlerIntegration:
 
         # Verify recent errors are limited
         recent_errors = error_tracker.get_recent_errors()
-        assert len(recent_errors) == 100  # Should be limited to max_recent_errors
+        assert len(recent_errors) == 100  # Should be limited to max_recent_errors (we added 200, kept 100)
 
         # Memory usage should be reasonable (not growing linearly with error count)
         # This is a basic check - in real scenarios you'd use memory profiling tools

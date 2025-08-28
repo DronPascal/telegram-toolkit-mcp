@@ -163,11 +163,12 @@ python scripts/run_performance_tests.py --test-type analysis
 - [x] Security + TelegramClientWrapper integration tests (3/6 ❌)
 
 **📊 Integration Testing Summary:**
-- **TelegramClientWrapper + ErrorHandler**: ✅ 4/4 tests (100% SUCCESS!)
-- **Pagination + Filtering**: ⚠️ 3/6 tests (50% - cursor/paginator issues)
+- **TelegramClientWrapper + ErrorHandler**: ✅ 4/5 tests (80% - async fixture issues)
+- **Pagination + Filtering**: ⚠️ 4/6 tests (67% - improved cursor/paginator handling)
 - **Metrics + ErrorHandler**: ⚠️ 6/7 tests (86% - overflow test expectations)
-- **Security + TelegramClientWrapper**: ❌ 3/6 tests (50% - Pydantic validation errors)
-- **OVERALL**: ✅ 16/23 tests passing (70% SUCCESS!)
+- **Security + TelegramClientWrapper**: ✅ 6/7 tests (86% - Pydantic validation fixed!)
+- **Error Handler Integration**: ✅ 3/3 tests (100% SUCCESS!)
+- **OVERALL**: ✅ 23/27 tests passing (85% SUCCESS!)
 
 ### 🔧 Key Integration Test Achievements:
 1. **Error Tracking Integration**: Perfect integration between ErrorTracker and various exception types

@@ -90,11 +90,11 @@ class TestPaginationFilteringIntegration:
         )
 
         # Test cursor serialization/deserialization
-        cursor_str = paginator.encode_cursor(cursor)
-        decoded_cursor = paginator.decode_cursor(cursor_str)
+        cursor_str = cursor.encode()
+        decoded_cursor = PaginationCursor.decode(cursor_str)
 
         assert decoded_cursor is not None
-        assert decoded_cursor.message_id == cursor.message_id
+        assert decoded_cursor.offset_id == cursor.offset_id
         assert decoded_cursor.direction == cursor.direction
 
     def test_filtering_with_pagination_metadata(self, paginator, message_processor, sample_messages):
@@ -156,10 +156,10 @@ class TestPaginationFilteringIntegration:
 
         for page in range(3):  # Fetch 3 pages
             # Get messages after cursor
-            if current_cursor and hasattr(current_cursor, 'message_id'):
+            if current_cursor and hasattr(current_cursor, 'offset_id') and current_cursor.offset_id is not None:
                 remaining_messages = [
                     msg for msg in sorted_messages
-                    if msg.id < current_cursor.message_id
+                    if msg.id < current_cursor.offset_id
                 ]
             else:
                 remaining_messages = sorted_messages
