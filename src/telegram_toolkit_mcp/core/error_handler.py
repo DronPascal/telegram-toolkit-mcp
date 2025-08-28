@@ -7,7 +7,6 @@ MCP-compliant error responses for the Telegram integration.
 
 import asyncio
 import datetime
-from datetime import timezone
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
@@ -178,8 +177,8 @@ def map_telethon_exception(exc: Exception) -> TelegramMCPException:
     _exc_type = type(exc).__name__
     exc_str = str(exc)
 
-    # Handle specific Telethon exceptions
-    if "flood" in exc_str.lower():
+    # Handle specific Telethon exceptions by class name or message
+    if _exc_type == "FloodWaitError" or "flood" in exc_str.lower():
         # Extract retry time from flood wait message
         import re
 
@@ -188,11 +187,11 @@ def map_telethon_exception(exc: Exception) -> TelegramMCPException:
 
         return FloodWaitException(retry_after, exc)
 
-    elif "chat not found" in exc_str.lower() or "peer not found" in exc_str.lower():
-        return ChatNotFoundException("unknown", exc)
-
-    elif "channel private" in exc_str.lower() or "you have not joined" in exc_str.lower():
+    elif _exc_type == "ChannelPrivateError" or "channel private" in exc_str.lower() or "you have not joined" in exc_str.lower():
         return ChannelPrivateException("unknown", exc)
+
+    elif _exc_type == "ChatNotFoundError" or "chat not found" in exc_str.lower() or "peer not found" in exc_str.lower():
+        return ChatNotFoundException("unknown", exc)
 
     elif "timeout" in exc_str.lower():
         return TelegramMCPException(TelegramMCPErrors.TIMEOUT_ERROR, "Request timed out", cause=exc)
@@ -450,6 +449,9 @@ class ErrorTracker:
         self.error_counts = defaultdict(int)
         self.recent_errors = []
         self.max_recent_errors = 100
+        # Aliases for backward compatibility
+        self.errors = self.recent_errors
+        self.max_errors = self.max_recent_errors
 
     def track_error(self, error: Exception, context: dict[str, Any] | None = None):
         """
@@ -466,7 +468,7 @@ class ErrorTracker:
         error_info = {
             "type": error_type,
             "message": str(error),
-            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "context": context or {},
         }
 
@@ -488,7 +490,39 @@ class ErrorTracker:
             "total_errors": sum(self.error_counts.values()),
             "recent_errors": self.recent_errors[-10:],  # Last 10 errors
             "unique_error_types": len(self.error_counts),
+            "error_types": dict(self.error_counts),  # Alias for compatibility
         }
+
+    def get_error_summary(self) -> dict[str, Any]:
+        """
+        Get error summary (alias for get_error_stats).
+
+        Returns:
+            Dict containing error statistics
+        """
+        return self.get_error_stats()
+
+    def get_recent_errors(self, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        Get recent errors with limit.
+
+        Args:
+            limit: Maximum number of recent errors to return
+
+        Returns:
+            List of recent error records
+        """
+        return self.recent_errors[-limit:]
+
+    @property
+    def error_limit(self) -> int:
+        """
+        Get the maximum number of recent errors to keep.
+
+        Returns:
+            Maximum error limit
+        """
+        return self.max_recent_errors
 
     def should_alert(self, error_type: str, threshold: int = 10) -> bool:
         """

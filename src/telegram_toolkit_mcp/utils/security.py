@@ -12,7 +12,7 @@ import os
 import secrets
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from .logging import PIIMasker, get_logger
 
@@ -25,10 +25,10 @@ class RateLimiter:
     def __init__(self, requests_per_minute: int = 30, burst_limit: int = 10):
         self.requests_per_minute = requests_per_minute
         self.burst_limit = burst_limit
-        self.requests: Dict[str, list] = defaultdict(list)
+        self.requests: dict[str, list] = defaultdict(list)
         self._lock = asyncio.Lock()
 
-    async def check_rate_limit(self, identifier: str) -> Tuple[bool, float]:
+    async def check_rate_limit(self, identifier: str) -> tuple[bool, float]:
         """
         Check if request is within rate limits.
 
@@ -44,8 +44,7 @@ class RateLimiter:
 
             # Clean old requests
             self.requests[identifier] = [
-                req_time for req_time in self.requests[identifier]
-                if req_time > cutoff
+                req_time for req_time in self.requests[identifier] if req_time > cutoff
             ]
 
             current_requests = len(self.requests[identifier])
@@ -58,7 +57,8 @@ class RateLimiter:
 
             # Check burst limit
             recent_requests = [
-                req_time for req_time in self.requests[identifier]
+                req_time
+                for req_time in self.requests[identifier]
                 if req_time > now - timedelta(seconds=10)
             ]
 
@@ -102,7 +102,8 @@ class InputValidator:
 
         # Allow only specific characters
         import re
-        if not re.match(r'^[@a-zA-Z0-9_/\-\.]+$', identifier):
+
+        if not re.match(r"^[@a-zA-Z0-9_/\-\.]+$", identifier):
             raise ValueError("Chat identifier contains invalid characters")
 
         return identifier
@@ -128,7 +129,7 @@ class InputValidator:
         return max(1, page_size)
 
     @staticmethod
-    def validate_date_range(from_date: Optional[str], to_date: Optional[str]) -> None:
+    def validate_date_range(from_date: str | None, to_date: str | None) -> None:
         """
         Validate date range parameters.
 
@@ -143,8 +144,8 @@ class InputValidator:
 
         if from_date and to_date:
             try:
-                from_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-                to_dt = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                from_dt = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+                to_dt = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
 
                 if from_dt >= to_dt:
                     raise ValueError("from_date must be before to_date")
@@ -183,11 +184,12 @@ class InputValidator:
 
         # Check for dangerous content
         import re
-        if '<' in query or '>' in query:
+
+        if "<" in query or ">" in query:
             raise ValueError("Search query contains dangerous characters")
 
         # Remove potentially dangerous characters
-        query = re.sub(r'[<>]', '', query)
+        query = re.sub(r"[<>]", "", query)
 
         return query
 
@@ -196,8 +198,8 @@ class SessionManager:
     """Secure session management for Telegram clients."""
 
     def __init__(self):
-        self._session_cache: Dict[str, bytes] = {}
-        self._session_hashes: Dict[str, str] = {}
+        self._session_cache: dict[str, bytes] = {}
+        self._session_hashes: dict[str, str] = {}
 
     def store_session(self, session_id: str, session_data: bytes) -> None:
         """
@@ -217,10 +219,10 @@ class SessionManager:
         logger.info(
             "Session stored securely",
             session_id=PIIMasker.hash_identifier(session_id, "session"),
-            session_hash=session_hash[:8] + "..."
+            session_hash=session_hash[:8] + "...",
         )
 
-    def get_session(self, session_id: str) -> Optional[bytes]:
+    def get_session(self, session_id: str) -> bytes | None:
         """
         Retrieve session data with integrity check.
 
@@ -241,7 +243,7 @@ class SessionManager:
         if actual_hash != expected_hash:
             logger.error(
                 "Session integrity check failed",
-                session_id=PIIMasker.hash_identifier(session_id, "session")
+                session_id=PIIMasker.hash_identifier(session_id, "session"),
             )
             # Remove corrupted session
             del self._session_cache[session_id]
@@ -264,8 +266,7 @@ class SessionManager:
             del self._session_cache[session_id]
             del self._session_hashes[session_id]
             logger.info(
-                "Session removed",
-                session_id=PIIMasker.hash_identifier(session_id, "session")
+                "Session removed", session_id=PIIMasker.hash_identifier(session_id, "session")
             )
             return True
         return False
@@ -277,7 +278,7 @@ class SessionManager:
         Returns:
             List of hashed session IDs
         """
-        return [f"session_{PIIMasker.hash_identifier(sid, '')}" for sid in self._session_cache.keys()]
+        return [f"session_{PIIMasker.hash_identifier(sid, '')}" for sid in self._session_cache]
 
     def clear_all_sessions(self) -> int:
         """
@@ -297,10 +298,10 @@ class SecurityAuditor:
     """Security auditing and monitoring."""
 
     def __init__(self):
-        self.security_events: list[Dict[str, Any]] = []
+        self.security_events: list[dict[str, Any]] = []
         self.max_events = 1000
 
-    def log_security_event(self, event_type: str, details: Dict[str, Any]) -> None:
+    def log_security_event(self, event_type: str, details: dict[str, Any]) -> None:
         """
         Log a security-related event.
 
@@ -309,24 +310,24 @@ class SecurityAuditor:
             details: Event details
         """
         event = {
-            'timestamp': datetime.now().isoformat(),
-            'event_type': event_type,
-            'details': PIIMasker.mask_dict(details)
+            "timestamp": datetime.now().isoformat(),
+            "event_type": event_type,
+            "details": PIIMasker.mask_dict(details),
         }
 
         self.security_events.append(event)
 
         # Keep only recent events
         if len(self.security_events) > self.max_events:
-            self.security_events = self.security_events[-self.max_events:]
+            self.security_events = self.security_events[-self.max_events :]
 
         logger.warning(
             "Security event logged",
             event_type=event_type,
-            masked_details=PIIMasker.mask_dict(details)
+            masked_details=PIIMasker.mask_dict(details),
         )
 
-    def get_security_events(self, limit: int = 100) -> list[Dict[str, Any]]:
+    def get_security_events(self, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get recent security events.
 
@@ -373,7 +374,7 @@ def generate_secure_token(length: int = 32) -> str:
     return secrets.token_hex(length)
 
 
-def hash_sensitive_data(data: str, salt: Optional[str] = None) -> str:
+def hash_sensitive_data(data: str, salt: str | None = None) -> str:
     """
     Hash sensitive data for storage/logging.
 
@@ -385,10 +386,6 @@ def hash_sensitive_data(data: str, salt: Optional[str] = None) -> str:
         str: Hashed data
     """
     if salt is None:
-        salt = os.environ.get('HASH_SALT', 'telegram-toolkit-mcp')
+        salt = os.environ.get("HASH_SALT", "telegram-toolkit-mcp")
 
-    return hmac.new(
-        salt.encode(),
-        data.encode(),
-        hashlib.sha256
-    ).hexdigest()
+    return hmac.new(salt.encode(), data.encode(), hashlib.sha256).hexdigest()

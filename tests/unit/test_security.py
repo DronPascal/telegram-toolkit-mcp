@@ -4,22 +4,21 @@ Unit tests for security utilities.
 Tests PII masking, rate limiting, input validation, and session management.
 """
 
-import asyncio
-import hashlib
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch
 
 from src.telegram_toolkit_mcp.utils.security import (
+    InputValidator,
     PIIMasker,
     RateLimiter,
-    InputValidator,
-    SessionManager,
     SecurityAuditor,
-    get_rate_limiter,
-    get_session_manager,
-    get_security_auditor,
+    SessionManager,
     generate_secure_token,
-    hash_sensitive_data
+    get_rate_limiter,
+    get_security_auditor,
+    get_session_manager,
+    hash_sensitive_data,
 )
 
 
@@ -37,7 +36,7 @@ class TestPIIMasker:
 
     def test_mask_text_api_credentials(self):
         """Test API credentials masking."""
-        text = 'api_id=12345 api_hash=abcdef1234567890 session_string=long_session_data'
+        text = "api_id=12345 api_hash=abcdef1234567890 session_string=long_session_data"
         masked = PIIMasker.mask_text(text)
 
         # Current implementation masks only the values, not the keys
@@ -60,11 +59,8 @@ class TestPIIMasker:
         data = {
             "username": "testuser",
             "api_id": "12345",
-            "nested": {
-                "session_string": "long_session_data",
-                "safe_field": "safe_value"
-            },
-            "safe_list": ["item1", "item2"]
+            "nested": {"session_string": "long_session_data", "safe_field": "safe_value"},
+            "safe_list": ["item1", "item2"],
         }
 
         masked = PIIMasker.mask_dict(data)
@@ -154,7 +150,7 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_cleanup(self, rate_limiter):
         """Test old request cleanup."""
-        with patch('src.telegram_toolkit_mcp.utils.security.datetime') as mock_datetime:
+        with patch("src.telegram_toolkit_mcp.utils.security.datetime") as mock_datetime:
             from datetime import datetime, timedelta
 
             # Set initial time
@@ -184,7 +180,7 @@ class TestInputValidator:
             "@testchannel",
             "t.me/testchannel",
             "test_channel_123",
-            "-1001234567890"
+            "-1001234567890",
         ]
 
         for identifier in valid_identifiers:
@@ -234,13 +230,19 @@ class TestInputValidator:
         """Test invalid date range validation."""
         # Invalid ranges
         with pytest.raises(ValueError, match="from_date must be before to_date"):
-            InputValidator.validate_date_range("2025-01-02T00:00:00Z", "2025-01-01T00:00:00Z")  # From > To
+            InputValidator.validate_date_range(
+                "2025-01-02T00:00:00Z", "2025-01-01T00:00:00Z"
+            )  # From > To
 
         with pytest.raises(ValueError, match="Date range cannot exceed 1 year"):
-            InputValidator.validate_date_range("2025-01-01T00:00:00Z", "2026-01-01T00:00:00Z")  # Too wide
+            InputValidator.validate_date_range(
+                "2025-01-01T00:00:00Z", "2026-01-01T00:00:00Z"
+            )  # Too wide
 
         with pytest.raises(ValueError, match="Invalid date format"):
-            InputValidator.validate_date_range("invalid-date", "2025-01-01T00:00:00Z")  # Invalid format
+            InputValidator.validate_date_range(
+                "invalid-date", "2025-01-01T00:00:00Z"
+            )  # Invalid format
 
     def test_sanitize_search_query_valid(self):
         """Test valid search query sanitization."""
@@ -357,11 +359,7 @@ class TestSecurityAuditor:
     def test_log_security_event(self, security_auditor):
         """Test security event logging."""
         event_type = "test_event"
-        details = {
-            "user": "testuser",
-            "ip": "192.168.1.100",
-            "api_key": "secret_key_123"
-        }
+        details = {"user": "testuser", "ip": "192.168.1.100", "api_key": "secret_key_123"}
 
         security_auditor.log_security_event(event_type, details)
 
