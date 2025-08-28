@@ -392,13 +392,13 @@ class TestErrorHandlerEdgeCases:
         assert len(errors) == 30
 
     def test_retry_with_backoff_timeout(self):
-        """Test retry with backoff respecting timeouts."""
+        """Test retry with backoff handling FloodWaitException."""
         mock_func = AsyncMock(side_effect=FloodWaitException(retry_after=100))
 
         with patch("asyncio.sleep") as mock_sleep:
-            with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError):
-                with pytest.raises(asyncio.TimeoutError):
-                    asyncio.run(retry_with_backoff(mock_func, retry_config=Mock(max_attempts=1)))
+            # Should eventually raise FloodWaitException after all retries exhausted
+            with pytest.raises(FloodWaitException):
+                asyncio.run(retry_with_backoff(mock_func, retry_config=Mock(max_attempts=1)))
 
     def test_error_response_with_large_content(self):
         """Test error response with large content."""

@@ -66,15 +66,15 @@ class TestMetricsCollector:
 
         # Check metrics were recorded
         metrics = metrics_collector.get_metrics()
-        assert 'mcp_tool_calls_total{tool="tg.fetch_history",status="success",chat_type="channel"} 1.0' in metrics
-        assert 'mcp_tool_duration_seconds_sum{tool="tg.fetch_history",status="success"} 1.5' in metrics
+        assert 'mcp_tool_calls_total{chat_type="channel",status="success",tool="tg.fetch_history"} 1.0' in metrics
+        assert 'mcp_tool_duration_seconds_sum{status="success",tool="tg.fetch_history"} 1.5' in metrics
 
     def test_record_tool_call_error(self, metrics_collector):
         """Test recording failed tool calls."""
         metrics_collector.record_tool_call("tg.resolve_chat", "error", "user")
 
         metrics = metrics_collector.get_metrics()
-        assert 'mcp_tool_calls_total{tool="tg.resolve_chat",status="error",chat_type="user"} 1.0' in metrics
+        assert 'mcp_tool_calls_total{chat_type="user",status="error",tool="tg.resolve_chat"} 1.0' in metrics
 
     def test_record_api_call(self, metrics_collector):
         """Test recording Telegram API calls."""
@@ -89,14 +89,14 @@ class TestMetricsCollector:
         metrics_collector.record_error("flood_wait", "fetch_history")
 
         metrics = metrics_collector.get_metrics()
-        assert 'telegram_toolkit_errors_total{error_type="flood_wait",component="fetch_history"} 1.0' in metrics
+        assert 'telegram_toolkit_errors_total{component="fetch_history",error_type="flood_wait"} 1.0' in metrics
 
     def test_record_flood_wait(self, metrics_collector):
         """Test recording FLOOD_WAIT events."""
         metrics_collector.record_flood_wait("tg.fetch_history", 1, 5.0)
 
         metrics = metrics_collector.get_metrics()
-        assert 'telegram_flood_wait_events_total{tool="tg.fetch_history",retry_attempt="1"} 1.0' in metrics
+        assert 'telegram_flood_wait_events_total{retry_attempt="1",tool="tg.fetch_history"} 1.0' in metrics
         assert 'telegram_flood_wait_duration_seconds_sum{tool="tg.fetch_history"} 5.0' in metrics
 
     def test_record_ndjson_export(self, metrics_collector):
@@ -112,14 +112,14 @@ class TestMetricsCollector:
         metrics_collector.record_messages_fetched("tg.fetch_history", 50, True)
 
         metrics = metrics_collector.get_metrics()
-        assert 'telegram_messages_fetched_total{tool="tg.fetch_history",has_filters="True"} 50.0' in metrics
+        assert 'telegram_messages_fetched_total{has_filters="True",tool="tg.fetch_history"} 50.0' in metrics
 
     def test_record_page_served(self, metrics_collector):
         """Test recording served pages."""
         metrics_collector.record_page_served("tg.fetch_history", "desc")
 
         metrics = metrics_collector.get_metrics()
-        assert 'telegram_pages_served_total{tool="tg.fetch_history",direction="desc"} 1.0' in metrics
+        assert 'telegram_pages_served_total{direction="desc",tool="tg.fetch_history"} 1.0' in metrics
 
     def test_update_gauges(self, metrics_collector):
         """Test updating gauge metrics."""
@@ -182,7 +182,7 @@ class TestGlobalFunctions:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{tool="test_tool",status="success",chat_type="channel"} 1.0' in metrics
+        assert 'mcp_tool_calls_total{chat_type="channel",status="success",tool="test_tool"} 1.0' in metrics
 
     def test_record_tool_error_function(self):
         """Test record_tool_error convenience function."""
@@ -192,7 +192,7 @@ class TestGlobalFunctions:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{tool="test_tool",status="error",chat_type="user"} 1.0' in metrics
+        assert 'mcp_tool_calls_total{chat_type="user",status="error",tool="test_tool"} 1.0' in metrics
 
     def test_record_api_call_function(self):
         """Test record_api_call convenience function."""
@@ -212,7 +212,7 @@ class TestGlobalFunctions:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'telegram_flood_wait_events_total{tool="test_tool",retry_attempt="2"} 1.0' in metrics
+        assert 'telegram_flood_wait_events_total{retry_attempt="2",tool="test_tool"} 1.0' in metrics
 
 
 class TestMetricsTimer:
@@ -228,7 +228,7 @@ class TestMetricsTimer:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{tool="test_tool",status="success"' in metrics
+        assert 'mcp_tool_calls_total{status="success",tool="test_tool"' in metrics
 
     def test_timer_error_path(self):
         """Test timer with failed operation."""
@@ -243,7 +243,7 @@ class TestMetricsTimer:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{tool="test_tool",status="error"' in metrics
+        assert 'mcp_tool_calls_total{status="error",tool="test_tool"' in metrics
 
     def test_timer_api_operation(self):
         """Test timer with API operation."""
@@ -312,8 +312,8 @@ class TestMetricsIntegration:
         metrics = collector.get_metrics()
 
         # Verify all metrics are present
-        assert 'telegram_messages_fetched_total{tool="tg.fetch_history",has_filters="True"} 25.0' in metrics
-        assert 'telegram_pages_served_total{tool="tg.fetch_history",direction="desc"} 1.0' in metrics
+        assert 'telegram_messages_fetched_total{has_filters="True",tool="tg.fetch_history"} 25.0' in metrics
+        assert 'telegram_pages_served_total{direction="desc",tool="tg.fetch_history"} 1.0' in metrics
         assert 'telegram_ndjson_exports_total{status="success"} 1.0' in metrics
 
     def test_metrics_with_resolve_chat(self):
@@ -326,8 +326,8 @@ class TestMetricsIntegration:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{tool="tg.resolve_chat",status="success",chat_type="channel"} 1.0' in metrics
-        assert 'mcp_tool_duration_seconds_sum{tool="tg.resolve_chat",status="success"} 0.3' in metrics
+        assert 'mcp_tool_calls_total{chat_type="channel",status="success",tool="tg.resolve_chat"} 1.0' in metrics
+        assert 'mcp_tool_duration_seconds_sum{status="success",tool="tg.resolve_chat"} 0.3' in metrics
 
     def test_metrics_error_scenarios(self):
         """Test metrics collection for error scenarios."""
@@ -339,7 +339,7 @@ class TestMetricsIntegration:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'mcp_tool_calls_total{tool="tg.fetch_history",status="error",chat_type="channel"} 1.0' in metrics
+        assert 'mcp_tool_calls_total{chat_type="channel",status="error",tool="tg.fetch_history"} 1.0' in metrics
 
     def test_metrics_performance_scenarios(self):
         """Test metrics collection for performance scenarios."""
@@ -352,7 +352,7 @@ class TestMetricsIntegration:
         collector = get_metrics_collector()
         metrics = collector.get_metrics()
 
-        assert 'telegram_messages_fetched_total{tool="tg.fetch_history",has_filters="False"} 5000.0' in metrics
+        assert 'telegram_messages_fetched_total{has_filters="False",tool="tg.fetch_history"} 5000.0' in metrics
 
     def test_metrics_histogram_buckets(self, metrics_collector):
         """Test histogram bucket distribution."""
@@ -365,9 +365,9 @@ class TestMetricsIntegration:
         metrics = metrics_collector.get_metrics()
 
         # Check that histogram buckets are working
-        assert 'mcp_tool_duration_seconds_bucket{tool="test_tool",status="success",le="0.1"}' in metrics
-        assert 'mcp_tool_duration_seconds_bucket{tool="test_tool",status="success",le="1.0"}' in metrics
-        assert 'mcp_tool_duration_seconds_bucket{tool="test_tool",status="success",le="10.0"}' in metrics
+        assert 'mcp_tool_duration_seconds_bucket{le="0.1",status="success",tool="test_tool"}' in metrics
+        assert 'mcp_tool_duration_seconds_bucket{le="1.0",status="success",tool="test_tool"}' in metrics
+        assert 'mcp_tool_duration_seconds_bucket{le="10.0",status="success",tool="test_tool"}' in metrics
 
 
 class TestMetricsEdgeCases:
@@ -407,7 +407,7 @@ class TestMetricsEdgeCases:
 
         metrics = metrics_collector.get_metrics()
         # Should have recorded 50 total calls (5 workers * 10 calls each)
-        assert 'mcp_tool_calls_total{tool="worker_0",status="success"' in metrics
+        assert 'mcp_tool_calls_total{status="success",tool="worker_0"' in metrics
 
     def test_metrics_memory_efficiency(self, metrics_collector):
         """Test that metrics don't consume excessive memory."""
