@@ -8,31 +8,33 @@ and returns standardized chat information for use by other MCP tools.
 """
 
 import re
-from typing import Dict, Union
 
 try:
-    from mcp import Tool
+    from mcp.server import Tool
     from mcp.server.fastmcp import Context
 except ImportError:
     # Fallback for development
     Tool = lambda **kwargs: lambda func: func
     Context = None
 
-from ..core.telegram_client import TelegramClientWrapper
 from ..core.error_handler import (
-    ChatNotFoundException,
     ChannelPrivateException,
-    ValidationException,
+    ChatNotFoundException,
     FloodWaitException,
-    error_handler,
+    ValidationException,
     create_success_response,
-    get_error_tracker
+    get_error_tracker,
 )
-from ..models.types import ResolveChatResponse
-from ..core.monitoring import record_tool_success, record_tool_error, MetricsTimer
-from ..core.tracing import trace_mcp_tool_call, trace_telegram_api_call, add_span_attribute, add_span_event
-from ..utils.security import get_rate_limiter, InputValidator, get_security_auditor
+from ..core.monitoring import MetricsTimer, record_tool_success
+from ..core.telegram_client import TelegramClientWrapper
+from ..core.tracing import (
+    add_span_attribute,
+    add_span_event,
+    trace_mcp_tool_call,
+    trace_telegram_api_call,
+)
 from ..utils.logging import get_logger
+from ..utils.security import InputValidator, get_rate_limiter, get_security_auditor
 
 logger = get_logger(__name__)
 
@@ -46,9 +48,9 @@ class ChatResolver:
     """
 
     # Regex patterns for different identifier formats
-    USERNAME_PATTERN = re.compile(r'^@([a-zA-Z0-9_]{5,32})$')
-    TELEGRAM_URL_PATTERN = re.compile(r'^https?://t\.me/([a-zA-Z0-9_]{5,32})(?:/.*)?$')
-    NUMERIC_ID_PATTERN = re.compile(r'^-?\d+$')
+    USERNAME_PATTERN = re.compile(r"^@([a-zA-Z0-9_]{5,32})$")
+    TELEGRAM_URL_PATTERN = re.compile(r"^https?://t\.me/([a-zA-Z0-9_]{5,32})(?:/.*)?$")
+    NUMERIC_ID_PATTERN = re.compile(r"^-?\d+$")
 
     @staticmethod
     def validate_chat_identifier(identifier: str) -> bool:
@@ -68,13 +70,13 @@ class ChatResolver:
 
         # Check against all patterns
         return (
-            ChatResolver.USERNAME_PATTERN.match(identifier) is not None or
-            ChatResolver.TELEGRAM_URL_PATTERN.match(identifier) is not None or
-            ChatResolver.NUMERIC_ID_PATTERN.match(identifier) is not None
+            ChatResolver.USERNAME_PATTERN.match(identifier) is not None
+            or ChatResolver.TELEGRAM_URL_PATTERN.match(identifier) is not None
+            or ChatResolver.NUMERIC_ID_PATTERN.match(identifier) is not None
         )
 
     @staticmethod
-    def parse_chat_identifier(identifier: str) -> Dict[str, str]:
+    def parse_chat_identifier(identifier: str) -> dict[str, str]:
         """
         Parse chat identifier into components.
 
@@ -93,36 +95,20 @@ class ChatResolver:
         username_match = ChatResolver.USERNAME_PATTERN.match(identifier)
         if username_match:
             username = username_match.group(1)
-            return {
-                'type': 'username',
-                'value': username,
-                'canonical': f"@{username}"
-            }
+            return {"type": "username", "value": username, "canonical": f"@{username}"}
 
         # Check URL format
         url_match = ChatResolver.TELEGRAM_URL_PATTERN.match(identifier)
         if url_match:
             username = url_match.group(1)
-            return {
-                'type': 'url',
-                'value': username,
-                'canonical': f"@{username}"
-            }
+            return {"type": "url", "value": username, "canonical": f"@{username}"}
 
         # Check numeric format
         if ChatResolver.NUMERIC_ID_PATTERN.match(identifier):
-            return {
-                'type': 'numeric',
-                'value': identifier,
-                'canonical': identifier
-            }
+            return {"type": "numeric", "value": identifier, "canonical": identifier}
 
         # Fallback (should not happen if validated)
-        return {
-            'type': 'unknown',
-            'value': identifier,
-            'canonical': identifier
-        }
+        return {"type": "unknown", "value": identifier, "canonical": identifier}
 
 
 @Tool(
@@ -135,16 +121,13 @@ class ChatResolver:
             "input": {
                 "type": "string",
                 "description": "Chat identifier (@username, t.me URL, or numeric ID)",
-                "examples": ["@telegram", "https://t.me/telegram", "136817688"]
+                "examples": ["@telegram", "https://t.me/telegram", "136817688"],
             }
         },
-        "additionalProperties": False
-    }
+        "additionalProperties": False,
+    },
 )
-async def resolve_chat_tool(
-    input: str,
-    ctx: Context = None
-) -> Dict:
+async def resolve_chat_tool(input: str, ctx: Context = None) -> dict:
     """
     MCP Tool: Resolve chat identifier to standardized format.
 
@@ -165,242 +148,202 @@ async def resolve_chat_tool(
         add_span_event("tool_started", {"tool": "tg.resolve_chat"})
 
         # Start metrics timer for the tool execution
-        with MetricsTimer('tool', 'tg.resolve_chat') as timer:
+        with MetricsTimer("tool", "tg.resolve_chat") as timer:
             try:
-            # Rate limiting check
-            rate_limiter = get_rate_limiter()
-            allowed, wait_time = await rate_limiter.check_rate_limit(f"resolve_chat:{input}")
+                # Rate limiting check
+                rate_limiter = get_rate_limiter()
+                allowed, wait_time = await rate_limiter.check_rate_limit(f"resolve_chat:{input}")
 
-            if not allowed:
-                get_security_auditor().log_security_event(
-                    "rate_limit_exceeded",
-                    {
-                        "tool": "tg.resolve_chat",
-                        "input": input,
-                        "wait_time": wait_time
+                if not allowed:
+                    get_security_auditor().log_security_event(
+                        "rate_limit_exceeded",
+                        {"tool": "tg.resolve_chat", "input": input, "wait_time": wait_time},
+                    )
+                    return {
+                        "isError": True,
+                        "error": {
+                            "type": "RATE_LIMIT_EXCEEDED",
+                            "title": "Rate limit exceeded",
+                            "status": 429,
+                            "detail": f"Too many requests. Please wait {wait_time:.1f} seconds.",
+                        },
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Rate limit exceeded. Please wait {wait_time:.1f} seconds before retrying.",
+                            }
+                        ],
                     }
-                )
-                return {
-                    "isError": True,
-                    "error": {
-                        "type": "RATE_LIMIT_EXCEEDED",
-                        "title": "Rate limit exceeded",
-                        "status": 429,
-                        "detail": f"Too many requests. Please wait {wait_time:.1f} seconds."
+
+                    # Input validation and sanitization
+                    try:
+                        input = InputValidator.sanitize_chat_identifier(input)
+                    except ValueError as e:
+                        get_security_auditor().log_security_event(
+                            "input_validation_failed",
+                            {"tool": "tg.resolve_chat", "input": input, "error": str(e)},
+                        )
+                        return {
+                            "isError": True,
+                            "error": {
+                                "type": "INPUT_VALIDATION_ERROR",
+                                "title": "Input validation failed",
+                                "status": 400,
+                                "detail": str(e),
+                            },
+                            "content": [{"type": "text", "text": f"Invalid input: {e}"}],
+                        }
+
+                    logger.info("Resolving chat identifier", input=input)
+
+                # Validate input
+                if not input or not isinstance(input, str):
+                    raise ValidationException(
+                        field="input", value=input, reason="Input must be a non-empty string"
+                    )
+
+                # Validate identifier format
+                if not ChatResolver.validate_chat_identifier(input):
+                    raise ValidationException(
+                        field="input",
+                        value=input,
+                        reason="Invalid chat identifier format. Use @username, t.me URL, or numeric ID",
+                    )
+
+                # Parse identifier
+                parsed = ChatResolver.parse_chat_identifier(input)
+                logger.info("Parsed identifier", parsed=parsed)
+
+                # Get MCP server from context to access Telegram client
+                if ctx is None:
+                    raise RuntimeError("MCP context not available")
+
+                # Access Telegram client through server state
+                # This will be injected by the server during tool registration
+                server_state = getattr(ctx, "_server_state", None)
+                if server_state is None:
+                    raise RuntimeError("Server state not available in context")
+
+                telegram_client = getattr(server_state, "telegram_client", None)
+                if telegram_client is None:
+                    raise RuntimeError("Telegram client not available")
+
+                # Wrap client for high-level operations
+                client_wrapper = TelegramClientWrapper(telegram_client)
+
+                # Get chat information with FLOOD_WAIT handling
+                try:
+                    with client_wrapper.session_context() as client:
+                        # Trace Telegram API call
+                        async with trace_telegram_api_call(
+                            "get_chat_info", {"chat": parsed["canonical"]}
+                        ):
+                            add_span_attribute("telegram.chat.canonical", parsed["canonical"])
+                            add_span_event("telegram_api_call_started", {"method": "get_chat_info"})
+                            chat_info = await client.get_chat_info(parsed["canonical"])
+                            add_span_event("telegram_api_call_completed", {"success": True})
+                except FloodWaitException as e:
+                    add_span_event(
+                        "telegram_api_call_failed",
+                        {"error": "FLOOD_WAIT", "retry_after": e.retry_after},
+                    )
+                    logger.warning(
+                        "FLOOD_WAIT encountered during chat resolution",
+                        input=input,
+                        retry_after=e.retry_after,
+                        error=str(e),
+                    )
+                    get_error_tracker().track_error(
+                        e, {"tool": "tg.resolve_chat", "input": input, "operation": "get_chat_info"}
+                    )
+                    return {
+                        "isError": True,
+                        "error": e.to_dict(),
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Rate limit exceeded. Please wait {e.retry_after} seconds before retrying.",
+                            }
+                        ],
+                    }
+
+                # Prepare response
+                response_data = {
+                    "chat_id": str(chat_info["id"]),
+                    "kind": chat_info["type"],
+                    "title": chat_info["title"],
+                    "username": chat_info.get("username"),
+                    "member_count": chat_info.get("participants_count"),
+                    "verified": chat_info.get("verified", False),
+                    "resolved_from": {
+                        "input": input,
+                        "type": parsed["type"],
+                        "canonical": parsed["canonical"],
                     },
-                    "content": [
+                }
+
+                # Record successful tool execution
+                record_tool_success("tg.resolve_chat", chat_type=response_data["kind"])
+
+                logger.info(
+                    "Chat resolved successfully",
+                    chat_id=response_data["chat_id"],
+                    kind=response_data["kind"],
+                    title=response_data["title"],
+                )
+
+                # Create MCP-compliant response
+                return create_success_response(
+                    content=[
                         {
                             "type": "text",
-                            "text": f"Rate limit exceeded. Please wait {wait_time:.1f} seconds before retrying."
+                            "text": f"Resolved chat: {response_data['title']} ({response_data['kind']})",
                         }
-                    ]
-                }
-
-            # Input validation and sanitization
-            try:
-                input = InputValidator.sanitize_chat_identifier(input)
-            except ValueError as e:
-                get_security_auditor().log_security_event(
-                    "input_validation_failed",
-                    {
-                        "tool": "tg.resolve_chat",
-                        "input": input,
-                        "error": str(e)
-                    }
+                    ],
+                    structured_content=response_data,
                 )
+
+            except ValidationException as e:
+                logger.warning("Input validation failed", error=e.message, input=input)
                 return {
                     "isError": True,
-                    "error": {
-                        "type": "INPUT_VALIDATION_ERROR",
-                        "title": "Input validation failed",
-                        "status": 400,
-                        "detail": str(e)
-                    },
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Invalid input: {e}"
-                        }
-                    ]
+                    "error": e.to_dict(),
+                    "content": [{"type": "text", "text": f"Invalid input: {e.message}"}],
                 }
 
-            logger.info("Resolving chat identifier", input=input)
-
-        # Validate input
-        if not input or not isinstance(input, str):
-            raise ValidationException(
-                field="input",
-                value=input,
-                reason="Input must be a non-empty string"
-            )
-
-        # Validate identifier format
-        if not ChatResolver.validate_chat_identifier(input):
-            raise ValidationException(
-                field="input",
-                value=input,
-                reason="Invalid chat identifier format. Use @username, t.me URL, or numeric ID"
-            )
-
-        # Parse identifier
-        parsed = ChatResolver.parse_chat_identifier(input)
-        logger.info("Parsed identifier", parsed=parsed)
-
-        # Get MCP server from context to access Telegram client
-        if ctx is None:
-            raise RuntimeError("MCP context not available")
-
-        # Access Telegram client through server state
-        # This will be injected by the server during tool registration
-        server_state = getattr(ctx, '_server_state', None)
-        if server_state is None:
-            raise RuntimeError("Server state not available in context")
-
-        telegram_client = getattr(server_state, 'telegram_client', None)
-        if telegram_client is None:
-            raise RuntimeError("Telegram client not available")
-
-        # Wrap client for high-level operations
-        client_wrapper = TelegramClientWrapper(telegram_client)
-
-        # Get chat information with FLOOD_WAIT handling
-        try:
-            with client_wrapper.session_context() as client:
-                # Trace Telegram API call
-                async with trace_telegram_api_call("get_chat_info", {"chat": parsed['canonical']}):
-                    add_span_attribute("telegram.chat.canonical", parsed['canonical'])
-                    add_span_event("telegram_api_call_started", {"method": "get_chat_info"})
-                    chat_info = await client.get_chat_info(parsed['canonical'])
-                    add_span_event("telegram_api_call_completed", {"success": True})
-        except FloodWaitException as e:
-            add_span_event("telegram_api_call_failed", {"error": "FLOOD_WAIT", "retry_after": e.retry_after})
-            logger.warning(
-                "FLOOD_WAIT encountered during chat resolution",
-                input=input,
-                retry_after=e.retry_after,
-                error=str(e)
-            )
-            get_error_tracker().track_error(e, {
-                "tool": "tg.resolve_chat",
-                "input": input,
-                "operation": "get_chat_info"
-            })
-            return {
-                "isError": True,
-                "error": e.to_dict(),
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"Rate limit exceeded. Please wait {e.retry_after} seconds before retrying."
-                    }
-                ]
-            }
-
-        # Prepare response
-        response_data = {
-            "chat_id": str(chat_info['id']),
-            "kind": chat_info['type'],
-            "title": chat_info['title'],
-            "username": chat_info.get('username'),
-            "member_count": chat_info.get('participants_count'),
-            "verified": chat_info.get('verified', False),
-            "resolved_from": {
-                "input": input,
-                "type": parsed['type'],
-                "canonical": parsed['canonical']
-            }
-        }
-
-        # Record successful tool execution
-        record_tool_success("tg.resolve_chat", chat_type=response_data['kind'])
-
-        logger.info(
-            "Chat resolved successfully",
-            chat_id=response_data['chat_id'],
-            kind=response_data['kind'],
-            title=response_data['title']
-        )
-
-        # Create MCP-compliant response
-        return create_success_response(
-            content=[
-                {
-                    "type": "text",
-                    "text": f"Resolved chat: {response_data['title']} ({response_data['kind']})"
+            except ChatNotFoundException as e:
+                logger.warning("Chat not found", chat=input, error=e.message)
+                return {
+                    "isError": True,
+                    "error": e.to_dict(),
+                    "content": [{"type": "text", "text": f"Chat not found: {e.message}"}],
                 }
-            ],
-            structured_content=response_data
-        )
 
-    except ValidationException as e:
-        logger.warning("Input validation failed", error=e.message, input=input)
-        return {
-            "isError": True,
-            "error": e.to_dict(),
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Invalid input: {e.message}"
+            except ChannelPrivateException as e:
+                logger.warning("Channel is private", chat=input, error=e.message)
+                get_error_tracker().track_error(e, {"tool": "tg.resolve_chat", "input": input})
+                return {
+                    "isError": True,
+                    "error": e.to_dict(),
+                    "content": [{"type": "text", "text": f"Channel is private: {e.message}"}],
                 }
-            ]
-        }
 
-    except ChatNotFoundException as e:
-        logger.warning("Chat not found", chat=input, error=e.message)
-        return {
-            "isError": True,
-            "error": e.to_dict(),
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Chat not found: {e.message}"
+            except FloodWaitException as e:
+                logger.warning("FLOOD_WAIT in resolve_chat", input=input, retry_after=e.retry_after)
+                get_error_tracker().track_error(e, {"tool": "tg.resolve_chat", "input": input})
+                return {
+                    "isError": True,
+                    "error": e.to_dict(),
+                    "content": [{"type": "text", "text": f"Rate limit exceeded: {e.message}"}],
                 }
-            ]
-        }
 
-    except ChannelPrivateException as e:
-        logger.warning("Channel is private", chat=input, error=e.message)
-        get_error_tracker().track_error(e, {"tool": "tg.resolve_chat", "input": input})
-        return {
-            "isError": True,
-            "error": e.to_dict(),
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Channel is private: {e.message}"
+            except Exception as e:
+                logger.error("Unexpected error in resolve_chat", error=str(e), input=input)
+                return {
+                    "isError": True,
+                    "error": {"code": "INTERNAL_ERROR", "message": f"Internal error: {str(e)}"},
+                    "content": [{"type": "text", "text": f"Internal error occurred: {str(e)}"}],
                 }
-            ]
-        }
-
-    except FloodWaitException as e:
-        logger.warning("FLOOD_WAIT in resolve_chat", input=input, retry_after=e.retry_after)
-        get_error_tracker().track_error(e, {"tool": "tg.resolve_chat", "input": input})
-        return {
-            "isError": True,
-            "error": e.to_dict(),
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Rate limit exceeded: {e.message}"
-                }
-            ]
-        }
-
-    except Exception as e:
-        logger.error("Unexpected error in resolve_chat", error=str(e), input=input)
-        return {
-            "isError": True,
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": f"Internal error: {str(e)}"
-            },
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Internal error occurred: {str(e)}"
-                }
-            ]
-        }
 
 
 # Export the tool function for registration

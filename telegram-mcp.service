@@ -1,0 +1,36 @@
+[Unit]
+Description=Telegram Toolkit MCP Server
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/telegram-toolkit-mcp
+EnvironmentFile=-/opt/telegram-toolkit-mcp/.env
+ExecStart=/opt/telegram-toolkit-mcp/venv/bin/python -m telegram_toolkit_mcp.server
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Restart on failure
+Restart=always
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=1G
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/telegram-toolkit-mcp /tmp/mcp-resources
+ProtectHome=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-mcp
+
+[Install]
+WantedBy=multi-user.target

@@ -8,56 +8,50 @@ chats with support for date ranges, pagination, and basic content filtering.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
-    from mcp import Tool
+    from mcp.server import Tool
     from mcp.server.fastmcp import Context
 except ImportError:
     # Fallback for development
     class Tool:
         def __init__(self, **kwargs):
             pass
+
         def __call__(self, func):
             return func
+
     Context = None
 
-from ..core.telegram_client import TelegramClientWrapper
 from ..core.error_handler import (
-    ChatNotFoundException,
     ChannelPrivateException,
+    ChatNotFoundException,
+    FloodWaitException,
     ValidationException,
-    error_handler,
     create_success_response,
     get_error_tracker,
-    retry_on_failure,
-    FloodWaitException
 )
-from ..core.pagination import Paginator, PaginationCursor, decode_cursor
-from ..core.filtering import get_message_processor, DateRangeFilter
-from ..core.ndjson_resources import get_resource_manager
+from ..core.filtering import DateRangeFilter, get_message_processor
 from ..core.monitoring import (
-    record_tool_success,
-    record_tool_error,
+    MetricsTimer,
     record_messages_fetched,
-    record_page_served,
     record_ndjson_export,
-    MetricsTimer
+    record_page_served,
 )
+from ..core.ndjson_resources import get_resource_manager
+from ..core.pagination import Paginator
+from ..core.telegram_client import TelegramClientWrapper
 from ..core.tracing import (
-    trace_mcp_tool_call,
-    trace_telegram_api_call,
-    trace_resource_operation,
     add_span_attribute,
-    add_span_event
+    add_span_event,
+    trace_mcp_tool_call,
+    trace_resource_operation,
+    trace_telegram_api_call,
 )
-from ..utils.security import (
-    get_rate_limiter,
-    InputValidator,
-    get_security_auditor
-)
-from ..models.types import MessageInfo, PageInfo, ExportInfo
+from ..models.types import ExportInfo, MessageInfo, PageInfo
 from ..utils.logging import get_logger
+from ..utils.security import InputValidator, get_rate_limiter, get_security_auditor
 
 logger = get_logger(__name__)
 
@@ -74,7 +68,9 @@ class MessageHistoryFetcher:
     DEFAULT_PAGE_SIZE = 50  # Default messages per page
 
     @staticmethod
-    def validate_date_range(from_date: Optional[str], to_date: Optional[str]) -> Tuple[Optional[datetime], Optional[datetime]]:
+    def validate_date_range(
+        from_date: str | None, to_date: str | None
+    ) -> tuple[datetime | None, datetime | None]:
         """
         Validate and parse date range parameters.
 
@@ -92,9 +88,7 @@ class MessageHistoryFetcher:
             return DateRangeFilter.validate_date_range(from_date, to_date)
         except ValueError as e:
             raise ValidationException(
-                field="date_range",
-                value=f"{from_date} to {to_date}",
-                reason=str(e)
+                field="date_range", value=f"{from_date} to {to_date}", reason=str(e)
             )
 
     @staticmethod
@@ -113,16 +107,14 @@ class MessageHistoryFetcher:
         """
         if page_size < 1:
             raise ValidationException(
-                field="page_size",
-                value=page_size,
-                reason="page_size must be positive"
+                field="page_size", value=page_size, reason="page_size must be positive"
             )
 
         if page_size > MessageHistoryFetcher.MAX_PAGE_SIZE:
             logger.warning(
                 "Page size too large, limiting to maximum",
                 requested=page_size,
-                max_allowed=MessageHistoryFetcher.MAX_PAGE_SIZE
+                max_allowed=MessageHistoryFetcher.MAX_PAGE_SIZE,
             )
             return MessageHistoryFetcher.MAX_PAGE_SIZE
 
@@ -130,10 +122,8 @@ class MessageHistoryFetcher:
 
     @staticmethod
     def format_messages_for_response(
-        messages: List[Dict],
-        page_size: int,
-        has_more: bool = False
-    ) -> Dict:
+        messages: list[dict], page_size: int, has_more: bool = False
+    ) -> dict:
         """
         Format messages for MCP response.
 
@@ -150,8 +140,8 @@ class MessageHistoryFetcher:
         for msg in messages:
             try:
                 # Convert timestamps
-                if 'date' in msg and isinstance(msg['date'], (int, float)):
-                    msg['date'] = datetime.fromtimestamp(msg['date'])
+                if "date" in msg and isinstance(msg["date"], (int, float)):
+                    msg["date"] = datetime.fromtimestamp(msg["date"])
 
                 # Create MessageInfo object
                 message_obj = MessageInfo(**msg)
@@ -159,8 +149,8 @@ class MessageHistoryFetcher:
             except Exception as e:
                 logger.warning(
                     "Failed to convert message to MessageInfo",
-                    message_id=msg.get('id'),
-                    error=str(e)
+                    message_id=msg.get("id"),
+                    error=str(e),
                 )
                 # Keep original format if conversion fails
                 message_objects.append(msg)
@@ -170,13 +160,13 @@ class MessageHistoryFetcher:
             cursor=f"after:{messages[-1]['id']}" if messages else "end",
             has_more=has_more,
             count=len(messages),
-            fetched=len(messages)
+            fetched=len(messages),
         )
 
         return {
             "messages": message_objects,
             "page_info": page_info.model_dump(),
-            "export": None  # Will be implemented with NDJSON resources
+            "export": None,  # Will be implemented with NDJSON resources
         }
 
 
@@ -189,38 +179,35 @@ class MessageHistoryFetcher:
         "properties": {
             "chat": {
                 "type": "string",
-                "description": "Chat identifier (@username, t.me URL, or numeric ID)"
+                "description": "Chat identifier (@username, t.me URL, or numeric ID)",
             },
             "from": {
                 "type": "string",
                 "format": "date-time",
-                "description": "Start date for message range (ISO 8601)"
+                "description": "Start date for message range (ISO 8601)",
             },
             "to": {
                 "type": "string",
                 "format": "date-time",
-                "description": "End date for message range (ISO 8601)"
+                "description": "End date for message range (ISO 8601)",
             },
             "page_size": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 100,
                 "default": 50,
-                "description": "Number of messages per page"
+                "description": "Number of messages per page",
             },
-            "cursor": {
-                "type": "string",
-                "description": "Base64-encoded cursor for pagination"
-            },
+            "cursor": {"type": "string", "description": "Base64-encoded cursor for pagination"},
             "direction": {
                 "type": "string",
                 "enum": ["asc", "desc"],
                 "default": "desc",
-                "description": "Sort direction: 'asc' for oldest first, 'desc' for newest first"
+                "description": "Sort direction: 'asc' for oldest first, 'desc' for newest first",
             },
             "search": {
                 "type": "string",
-                "description": "Search query to filter messages by text content"
+                "description": "Search query to filter messages by text content",
             },
             "filter": {
                 "type": "object",
@@ -230,47 +217,57 @@ class MessageHistoryFetcher:
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "enum": ["text", "photo", "video", "document", "audio", "voice", "sticker", "link", "poll"]
+                            "enum": [
+                                "text",
+                                "photo",
+                                "video",
+                                "document",
+                                "audio",
+                                "voice",
+                                "sticker",
+                                "link",
+                                "poll",
+                            ],
                         },
-                        "description": "Filter by media types"
+                        "description": "Filter by media types",
                     },
                     "has_media": {
                         "type": "boolean",
-                        "description": "Filter messages with/without media attachments"
+                        "description": "Filter messages with/without media attachments",
                     },
                     "from_users": {
                         "type": "array",
                         "items": {"type": "integer"},
-                        "description": "Filter by sender user IDs"
+                        "description": "Filter by sender user IDs",
                     },
                     "min_views": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "Minimum view count for messages"
+                        "description": "Minimum view count for messages",
                     },
                     "max_views": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "Maximum view count for messages"
-                    }
+                        "description": "Maximum view count for messages",
+                    },
                 },
-                "additionalProperties": False
-            }
+                "additionalProperties": False,
+            },
         },
-        "additionalProperties": False
-    }
+        "additionalProperties": False,
+    },
 )
 async def fetch_history_tool(
     chat: str,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
     page_size: int = 50,
-    cursor: Optional[str] = None,
+    cursor: str | None = None,
     direction: str = "desc",
-    search: Optional[str] = None,
-    filter: Optional[Dict[str, Any]] = None,
-    ctx: Context = None
-) -> Dict:
+    search: str | None = None,
+    filter: dict[str, Any] | None = None,
+    ctx: Context = None,
+) -> dict:
     """
     MCP Tool: Fetch message history from Telegram chats with advanced filtering.
 
@@ -301,7 +298,7 @@ async def fetch_history_tool(
         "cursor": cursor,
         "direction": direction,
         "search": search,
-        "filter": filter
+        "filter": filter,
     }
 
     # Start tracing for the MCP tool call
@@ -316,7 +313,7 @@ async def fetch_history_tool(
         add_span_event("tool_started", {"tool": "tg.fetch_history"})
 
         # Start metrics timer for the tool execution
-        with MetricsTimer('tool', 'tg.fetch_history') as timer:
+        with MetricsTimer("tool", "tg.fetch_history") as timer:
             try:
                 # Rate limiting check
                 rate_limiter = get_rate_limiter()
@@ -325,11 +322,7 @@ async def fetch_history_tool(
                 if not allowed:
                     get_security_auditor().log_security_event(
                         "rate_limit_exceeded",
-                        {
-                            "tool": "tg.fetch_history",
-                            "chat": chat,
-                            "wait_time": wait_time
-                        }
+                        {"tool": "tg.fetch_history", "chat": chat, "wait_time": wait_time},
                     )
                     return {
                         "isError": True,
@@ -337,14 +330,14 @@ async def fetch_history_tool(
                             "type": "RATE_LIMIT_EXCEEDED",
                             "title": "Rate limit exceeded",
                             "status": 429,
-                            "detail": f"Too many requests. Please wait {wait_time:.1f} seconds."
+                            "detail": f"Too many requests. Please wait {wait_time:.1f} seconds.",
                         },
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Rate limit exceeded. Please wait {wait_time:.1f} seconds before retrying."
+                                "text": f"Rate limit exceeded. Please wait {wait_time:.1f} seconds before retrying.",
                             }
-                        ]
+                        ],
                     }
 
                 # Input validation and sanitization
@@ -359,6 +352,7 @@ async def fetch_history_tool(
                     if cursor:
                         # Basic cursor format validation
                         import base64
+
                         try:
                             base64.b64decode(cursor)
                         except Exception:
@@ -370,8 +364,8 @@ async def fetch_history_tool(
                         {
                             "tool": "tg.fetch_history",
                             "input": {"chat": chat, "page_size": page_size, "search": search},
-                            "error": str(e)
-                        }
+                            "error": str(e),
+                        },
                     )
                     return {
                         "isError": True,
@@ -379,14 +373,9 @@ async def fetch_history_tool(
                             "type": "INPUT_VALIDATION_ERROR",
                             "title": "Input validation failed",
                             "status": 400,
-                            "detail": str(e)
+                            "detail": str(e),
                         },
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"Invalid input: {e}"
-                            }
-                        ]
+                        "content": [{"type": "text", "text": f"Invalid input: {e}"}],
                     }
 
                 logger.info(
@@ -398,8 +387,8 @@ async def fetch_history_tool(
                     cursor=cursor,
                     direction=direction,
                     search=search,
-                    filter=filter
-                )   
+                    filter=filter,
+                )
 
                 # Validate inputs and parse dates
                 from_dt, to_dt = MessageHistoryFetcher.validate_date_range(from_date, to_date)
@@ -416,7 +405,7 @@ async def fetch_history_tool(
                     logger.warning(
                         "Cursor direction mismatch, using cursor direction",
                         cursor_direction=current_cursor.direction,
-                        requested_direction=direction
+                        requested_direction=direction,
                     )
                     direction = current_cursor.direction
 
@@ -424,11 +413,11 @@ async def fetch_history_tool(
                 if ctx is None:
                     raise RuntimeError("MCP context not available")
 
-                server_state = getattr(ctx, '_server_state', None)
+                server_state = getattr(ctx, "_server_state", None)
                 if server_state is None:
                     raise RuntimeError("Server state not available in context")
 
-                telegram_client = getattr(server_state, 'telegram_client', None)
+                telegram_client = getattr(server_state, "telegram_client", None)
                 if telegram_client is None:
                     raise RuntimeError("Telegram client not available")
 
@@ -445,14 +434,14 @@ async def fetch_history_tool(
 
                 # Add search if provided
                 if search:
-                    pagination_params['search'] = search
+                    pagination_params["search"] = search
 
                 # Add initial date filtering if no cursor and dates provided
                 if not cursor:  # Only for first page
                     if from_date:
-                        from_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-                        if 'offset_date' not in pagination_params:
-                            pagination_params['offset_date'] = from_dt
+                        from_dt = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+                        if "offset_date" not in pagination_params:
+                            pagination_params["offset_date"] = from_dt
 
                 # Fetch messages with automatic FLOOD_WAIT handling
                 try:
@@ -460,39 +449,44 @@ async def fetch_history_tool(
                         # Trace Telegram API call
                         async with trace_telegram_api_call("fetch_messages", pagination_params):
                             add_span_attribute("telegram.chat", chat)
-                            add_span_attribute("telegram.limit", pagination_params.get('limit', 0))
-                            add_span_attribute("telegram.offset_id", pagination_params.get('offset_id', 0))
-                            add_span_event("telegram_api_call_started", {"method": "fetch_messages"})
+                            add_span_attribute("telegram.limit", pagination_params.get("limit", 0))
+                            add_span_attribute(
+                                "telegram.offset_id", pagination_params.get("offset_id", 0)
+                            )
+                            add_span_event(
+                                "telegram_api_call_started", {"method": "fetch_messages"}
+                            )
                             messages = await client.fetch_messages(chat, **pagination_params)
-                            add_span_event("telegram_api_call_completed", {
-                                "success": True,
-                                "messages_count": len(messages) if messages else 0
-                            })
+                            add_span_event(
+                                "telegram_api_call_completed",
+                                {
+                                    "success": True,
+                                    "messages_count": len(messages) if messages else 0,
+                                },
+                            )
                 except FloodWaitException as e:
-                    add_span_event("telegram_api_call_failed", {
-                        "error": "FLOOD_WAIT",
-                        "retry_after": e.retry_after
-                    })
+                    add_span_event(
+                        "telegram_api_call_failed",
+                        {"error": "FLOOD_WAIT", "retry_after": e.retry_after},
+                    )
                     logger.warning(
                         "FLOOD_WAIT encountered during message fetch",
                         chat=chat,
                         retry_after=e.retry_after,
-                        error=str(e)
+                        error=str(e),
                     )
-                    get_error_tracker().track_error(e, {
-                        "tool": "tg.fetch_history",
-                        "chat": chat,
-                        "operation": "fetch_messages"
-                    })
+                    get_error_tracker().track_error(
+                        e, {"tool": "tg.fetch_history", "chat": chat, "operation": "fetch_messages"}
+                    )
                     return {
                         "isError": True,
                         "error": e.to_dict(),
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Rate limit exceeded. Please wait {e.retry_after} seconds before retrying."
+                                "text": f"Rate limit exceeded. Please wait {e.retry_after} seconds before retrying.",
                             }
-                        ]
+                        ],
                     }
 
                 # Apply server-side filtering and processing
@@ -512,7 +506,7 @@ async def fetch_history_tool(
                     search_query=search,
                     media_types=media_types,
                     sender_ids=from_users,
-                    deduplicate=True
+                    deduplicate=True,
                 )
 
                 # Apply additional filters that aren't handled by the processor
@@ -536,8 +530,8 @@ async def fetch_history_tool(
                         "media_types": bool(media_types),
                         "has_media": has_media is not None,
                         "from_users": bool(from_users),
-                        "views_range": bool(min_views is not None or max_views is not None)
-                    }
+                        "views_range": bool(min_views is not None or max_views is not None),
+                    },
                 )
 
                 # Determine if there are more messages
@@ -559,10 +553,10 @@ async def fetch_history_tool(
                         async with trace_resource_operation("create", "ndjson_export"):
                             add_span_attribute("resource.messages_count", len(messages))
                             add_span_attribute("resource.chat", chat)
-                            add_span_event("resource_creation_started", {
-                                "operation": "create_ndjson",
-                                "messages_count": len(messages)
-                            })
+                            add_span_event(
+                                "resource_creation_started",
+                                {"operation": "create_ndjson", "messages_count": len(messages)},
+                            )
 
                             resource_manager = get_resource_manager()
                             resource_info = await resource_manager.create_ndjson_resource(
@@ -572,17 +566,19 @@ async def fetch_history_tool(
                                     "from_date": from_date,
                                     "to_date": to_date,
                                     "direction": direction,
-                                    "search": search
-                                }
+                                    "search": search,
+                                },
                             )
 
-                            add_span_event("resource_creation_completed", {
-                                "success": True,
-                                "resource_id": resource_info.get("resource_id", "unknown")
-                            })
+                            add_span_event(
+                                "resource_creation_completed",
+                                {
+                                    "success": True,
+                                    "resource_id": resource_info.get("resource_id", "unknown"),
+                                },
+                            )
                         export_info = ExportInfo(
-                            uri=resource_info["uri"],
-                            format="ndjson"
+                            uri=resource_info["uri"], format="ndjson"
                         ).model_dump()
 
                         # Record NDJSON export metrics
@@ -591,17 +587,16 @@ async def fetch_history_tool(
                         logger.info(
                             "NDJSON resource created for large dataset",
                             resource_id=resource_info["resource_id"],
-                            item_count=len(messages)
+                            item_count=len(messages),
                         )
 
                     except Exception as e:
-                        add_span_event("resource_creation_failed", {
-                            "error": str(e),
-                            "messages_count": len(messages)
-                        })
+                        add_span_event(
+                            "resource_creation_failed",
+                            {"error": str(e), "messages_count": len(messages)},
+                        )
                         logger.warning(
-                            "Failed to create NDJSON resource, using inline data",
-                            error=str(e)
+                            "Failed to create NDJSON resource, using inline data", error=str(e)
                         )
                         record_ndjson_export("error")
 
@@ -621,7 +616,15 @@ async def fetch_history_tool(
                     response_data["export"] = export_info
 
                 # Record metrics for successful operation
-                has_filters = bool(search or media_types or from_users or min_views is not None or max_views is not None or from_date or to_date)
+                has_filters = bool(
+                    search
+                    or media_types
+                    or from_users
+                    or min_views is not None
+                    or max_views is not None
+                    or from_date
+                    or to_date
+                )
                 record_messages_fetched("tg.fetch_history", len(messages), has_filters)
                 record_page_served("tg.fetch_history", direction)
 
@@ -638,8 +641,8 @@ async def fetch_history_tool(
                         "media_types": bool(media_types),
                         "from_users": bool(from_users),
                         "views_filter": bool(min_views is not None or max_views is not None),
-                        "date_range": bool(from_date or to_date)
-                    }
+                        "date_range": bool(from_date or to_date),
+                    },
                 )
 
                 # Create MCP-compliant response
@@ -650,13 +653,8 @@ async def fetch_history_tool(
                     status_text += " (end of results)"
 
                 return create_success_response(
-                    content=[
-                        {
-                            "type": "text",
-                            "text": status_text
-                        }
-                    ],
-                    structured_content=response_data
+                    content=[{"type": "text", "text": status_text}],
+                    structured_content=response_data,
                 )
 
             except ValidationException as e:
@@ -665,12 +663,7 @@ async def fetch_history_tool(
                 return {
                     "isError": True,
                     "error": e.to_dict(),
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Invalid input: {e.message}"
-                        }
-                    ]
+                    "content": [{"type": "text", "text": f"Invalid input: {e.message}"}],
                 }
 
             except ChatNotFoundException as e:
@@ -679,12 +672,7 @@ async def fetch_history_tool(
                 return {
                     "isError": True,
                     "error": e.to_dict(),
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Chat not found: {e.message}"
-                        }
-                    ]
+                    "content": [{"type": "text", "text": f"Chat not found: {e.message}"}],
                 }
 
             except ChannelPrivateException as e:
@@ -693,12 +681,7 @@ async def fetch_history_tool(
                 return {
                     "isError": True,
                     "error": e.to_dict(),
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Channel is private: {e.message}"
-                        }
-                    ]
+                    "content": [{"type": "text", "text": f"Channel is private: {e.message}"}],
                 }
 
             except FloodWaitException as e:
@@ -707,12 +690,7 @@ async def fetch_history_tool(
                 return {
                     "isError": True,
                     "error": e.to_dict(),
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Rate limit exceeded: {e.message}"
-                        }
-                    ]
+                    "content": [{"type": "text", "text": f"Rate limit exceeded: {e.message}"}],
                 }
 
             except Exception as e:
@@ -721,26 +699,21 @@ async def fetch_history_tool(
                     error=str(e),
                     chat=chat,
                     from_date=from_date,
-                    to_date=to_date
+                    to_date=to_date,
                 )
-                get_error_tracker().track_error(e, {
-                    "tool": "tg.fetch_history",
-                    "chat": chat,
-                    "from_date": from_date,
-                    "to_date": to_date
-                })
+                get_error_tracker().track_error(
+                    e,
+                    {
+                        "tool": "tg.fetch_history",
+                        "chat": chat,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                    },
+                )
                 return {
                     "isError": True,
-                    "error": {
-                        "code": "INTERNAL_ERROR",
-                        "message": f"Internal error: {str(e)}"
-                    },
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Internal error occurred: {str(e)}"
-                        }
-                    ]
+                    "error": {"code": "INTERNAL_ERROR", "message": f"Internal error: {str(e)}"},
+                    "content": [{"type": "text", "text": f"Internal error occurred: {str(e)}"}],
                 }
 
 

@@ -103,7 +103,7 @@ class InputValidator:
         # Allow only specific characters
         import re
 
-        if not re.match(r"^[@a-zA-Z0-9_/\-\.]+$", identifier):
+        if not re.match(r"^[@a-zA-Z0-9_/\-\.:]+$", identifier):
             raise ValueError("Chat identifier contains invalid characters")
 
         return identifier

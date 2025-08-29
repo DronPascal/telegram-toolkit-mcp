@@ -6,6 +6,13 @@
 
 **Read-only MCP server for safe extraction of Telegram message history from public chats with proper pagination, error handling, and NDJSON resource streaming.**
 
+## 🚀 Key Features
+
+- **Remote MCP Support**: HTTP transport with Streamable endpoints for production deployment
+- **Enterprise Ready**: Docker deployment, health checks, monitoring, and SSL
+- **Production Deployment**: One-command setup with Nginx reverse proxy and Cloudflare integration
+- **MCP 2025-06-18 Compliant**: Full compliance with latest Model Context Protocol specification
+
 ## 🚀 Features
 
 - **MCP 2025-06-18 Compliant**: Full compliance with latest Model Context Protocol specification
@@ -16,6 +23,7 @@
 - **Observability**: Built-in Prometheus metrics and OpenTelemetry tracing
 - **Security First**: PII protection, secure session management
 - **Production Ready**: Async architecture with proper resource cleanup
+- **Production Ready**: Deploy with Docker + Nginx + SSL on any domain
 
 ## 📋 Table of Contents
 
@@ -32,39 +40,102 @@
 ## 🚀 Quick Start
 
 ```bash
-# 1. Install
-pip install telegram-toolkit-mcp
+# 1. Clone the repository
+git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
+cd telegram-toolkit-mcp
 
 # 2. Configure (copy and edit)
 cp env.example .env
 # Edit .env with your Telegram API credentials
 
-# 3. Run
-telegram-mcp-server
+# 3. Run locally
+python -m telegram_toolkit_mcp.server
+# Or after installing the package:
+# telegram-mcp-server
+# Server will be available at http://localhost:8000/mcp
 
-# 4. Connect your MCP client
-# Server will be available at http://localhost:8000
+# 4. Test MCP endpoint
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+
+# 5. Connect your MCP client (see examples below)
 ```
+
+## 🚀 Production Deployment
+
+### Enterprise Deployment Features
+**✅ Production Ready** - Deploy on any domain with enterprise-grade infrastructure
+
+**Deployment Options**:
+- **Automated**: One-command deployment script
+- **Docker**: Containerized with health checks
+- **Nginx**: Reverse proxy with SSL termination
+- **SSL**: Let's Encrypt certificates with auto-renewal
+- **Monitoring**: Built-in health checks and metrics
+
+### Automated Deployment
+```bash
+# Deploy to your domain
+./deploy.sh your-domain.com admin@your-domain.com
+
+# Example with a real domain
+./deploy.sh mcp.example.com admin@example.com
+```
+
+### Production Endpoints (After Deployment)
+```bash
+# Health check
+curl https://your-domain.com/health
+
+# MCP tools list
+curl -X POST https://your-domain.com/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+
+# Test chat resolution
+curl -X POST https://your-domain.com/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+      "name": "tg.resolve_chat",
+      "arguments": {"input": "@telegram"}
+    }
+  }'
+```
+
+### Infrastructure Requirements
+- Ubuntu 20.04+ VPS with root access
+- Domain name configured in DNS
+- Docker & Docker Compose installed
+- Telegram API credentials
 
 ## 📦 Installation
 
-### From PyPI (recommended)
+### From Source (recommended)
 ```bash
-pip install telegram-toolkit-mcp
-```
-
-### From Source
-```bash
+# Clone the repository
 git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
 cd telegram-toolkit-mcp
-pip install -e .
+
+# Install dependencies
+pip install -r requirements.txt
+
+# For development with extra tools
+pip install -r requirements.txt
+pip install pytest black ruff mypy  # Development tools
 ```
 
-### Development Setup
+### Docker Deployment
 ```bash
-git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
-cd telegram-toolkit-mcp
-pip install -e ".[dev,observability]"
+# Build and run with Docker Compose
+docker compose up -d
+
+# Check logs
+docker compose logs -f
 ```
 
 ## ⚙️ Configuration
@@ -112,7 +183,7 @@ from mcp.client.stdio import stdio_client
 async def main():
     # Connect to MCP server
     async with stdio_client([
-        "telegram-mcp-server"
+        "python", "-m", "telegram_toolkit_mcp.server"
     ]) as (read, write):
         async with ClientSession(read, write) as session:
             # Resolve chat
@@ -145,12 +216,23 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "telegram-toolkit": {
-      "command": "telegram-mcp-server",
-      "env": {
-        "TELEGRAM_API_ID": "your_api_id",
-        "TELEGRAM_API_HASH": "your_api_hash",
-        "TELEGRAM_STRING_SESSION": "your_session_string"
-      }
+      "command": "npx",
+      "args": ["@modelcontextprotocol/inspector", "--remote", "https://your-domain.com/mcp"]
+    }
+  }
+}
+```
+
+### Direct HTTP Connection
+
+For direct HTTP connection without MCP Inspector:
+
+```json
+{
+  "mcpServers": {
+    "telegram-toolkit": {
+      "command": "curl",
+      "args": ["-X", "POST", "https://your-domain.com/mcp", "-H", "Content-Type: application/json", "-d", "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/list\"}"]
     }
   }
 }

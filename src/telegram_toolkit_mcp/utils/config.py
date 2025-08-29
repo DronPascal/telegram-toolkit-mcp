@@ -85,9 +85,7 @@ class ObservabilityConfig(BaseModel):
     service_name: str = Field(
         default="telegram-toolkit-mcp", description="Service name for tracing"
     )
-    service_version: str = Field(
-        default="1.0.0", description="Service version for tracing"
-    )
+    service_version: str = Field(default="1.0.0", description="Service version for tracing")
     trace_sampling_rate: float = Field(
         default=1.0, ge=0.0, le=1.0, description="Trace sampling rate (0.0-1.0)"
     )
@@ -128,6 +126,7 @@ def load_config() -> AppConfig:
         # Load environment variables from .env file
         try:
             from dotenv import load_dotenv
+
             load_dotenv()
         except ImportError:
             # dotenv not available, rely on system environment
@@ -189,17 +188,33 @@ def validate_telegram_credentials(config: AppConfig) -> bool:
     """
     telegram = config.telegram
 
-    if telegram.api_id == 0 or not telegram.api_hash:
+    # Debug logging
+    print(
+        f"DEBUG: Validating credentials - api_id: {telegram.api_id}, api_hash_len: {len(telegram.api_hash) if telegram.api_hash else 0}"
+    )
+
+    if not telegram.api_id or not telegram.api_hash:
+        print("DEBUG: Missing api_id or api_hash")
         return False
 
     # Basic validation - API ID should be a reasonable number
-    if not (1000 <= telegram.api_id <= 999999):
+    try:
+        api_id_int = int(telegram.api_id)
+        print(f"DEBUG: API ID int value: {api_id_int}")
+        # Telegram API IDs can be larger than 999999
+        if api_id_int <= 0:
+            print(f"DEBUG: API ID invalid: {api_id_int}")
+            return False
+    except (ValueError, TypeError) as e:
+        print(f"DEBUG: API ID conversion error: {e}")
         return False
 
     # API hash should be 32-character hex string
     if len(telegram.api_hash) != 32:
+        print(f"DEBUG: API hash length invalid: {len(telegram.api_hash)}")
         return False
 
+    print("DEBUG: Credentials validation passed")
     return True
 
 

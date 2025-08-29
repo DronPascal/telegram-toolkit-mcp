@@ -2,9 +2,9 @@
 
 ## Core Architectural Patterns
 
-### 1. MCP Server Pattern
+### 1. HTTP Transport MCP Server Pattern
 ```python
-# FastMCP-based server with lifespan management
+# FastMCP-based server with HTTP transport and health endpoints
 class TelegramMCPServer:
     def __init__(self):
         self.mcp = FastMCP("Telegram History Exporter")
@@ -18,8 +18,18 @@ class TelegramMCPServer:
             os.getenv("TELEGRAM_API_HASH")
         )
         await self.telegram_client.start()
+
+        # Add health endpoint
+        @self.mcp.app.get("/health")
+        async def health_endpoint():
+            return PlainTextResponse("OK", status_code=200)
+
         yield
         await self.telegram_client.disconnect()
+
+    def run_server_sync(self):
+        """Run with HTTP transport (synchronous for production)"""
+        self.mcp.run(transport="http", host="0.0.0.0", port=8000)
 ```
 
 ### 2. Tool Implementation Pattern
@@ -435,4 +445,166 @@ class TelegramConfig:
         )
 ```
 
-These patterns ensure consistent, reliable, and maintainable implementation across the entire codebase.
+## Production Deployment Patterns
+
+### 1. Docker Compose v2 Production Pattern
+```yaml
+services:
+  telegram-mcp:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"  # Secure binding
+    environment:
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_STRING_SESSION=${TELEGRAM_STRING_SESSION}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+# Commands
+docker compose up -d
+docker compose logs -f
+curl http://localhost:8000/health
+```
+
+### 2. Nginx Streaming Proxy Pattern
+```nginx
+# nginx.conf for Streamable HTTP
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    location /mcp {
+        proxy_pass http://127.0.0.1:8000/mcp;
+
+        # CRITICAL: Disable buffering for streaming
+        proxy_buffering off;
+        proxy_request_buffering off;
+
+        # Long timeouts for streaming responses
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+
+        # Connection upgrade support
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_buffering on;
+        proxy_read_timeout 10s;
+    }
+}
+```
+
+### 3. Automated Deployment Pattern
+```bash
+#!/bin/bash
+# deploy.sh - One-command production deployment
+
+DOMAIN_NAME=${1:-"your-domain.com"}
+EMAIL=${2:-"admin@your-domain.com"}
+
+# Pre-deployment checks
+if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+    echo "❌ Docker Compose v2 required"
+    exit 1
+fi
+
+# Create directories and copy files
+sudo mkdir -p /opt/telegram-toolkit-mcp
+sudo chown -R $USER:$USER /opt/telegram-toolkit-mcp
+cp -r . /opt/telegram-toolkit-mcp/
+
+# Configure environment
+cd /opt/telegram-toolkit-mcp
+cp env.example .env
+# User edits .env with credentials
+
+# Deploy and configure
+docker compose up -d
+./configure-nginx.sh $DOMAIN_NAME
+sudo certbot --nginx -d $DOMAIN_NAME --email $EMAIL
+
+echo "✅ Deployment complete!"
+echo "🌐 https://$DOMAIN_NAME"
+```
+
+### 4. Health Check Pattern
+```python
+# Health endpoint in FastMCP
+@mcp.app.get("/health")
+async def health_endpoint():
+    """Health check for load balancers and monitoring."""
+    return PlainTextResponse("OK", status_code=200)
+
+# Docker health check
+healthcheck:
+  test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+```
+
+### 5. MCP Client Integration Pattern
+```json
+{
+  "mcpServers": {
+    "telegram-toolkit": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/inspector", "--remote", "https://your-domain.com/mcp"]
+    }
+  }
+}
+```
+
+```bash
+# Test MCP connection
+curl -X POST https://your-domain.com/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'
+```
+
+## Migration Patterns
+
+### From STDIO to HTTP Transport
+```python
+# OLD: STDIO transport (local only)
+await mcp.run()  # Could cause event loop conflicts
+
+# NEW: HTTP transport (production-ready)
+mcp.run(transport="http", host="0.0.0.0", port=8000)
+
+# Benefits:
+# ✅ No event loop conflicts
+# ✅ Remote MCP client support
+# ✅ Production deployment ready
+# ✅ Health checks and monitoring
+# ✅ Streamable HTTP for large responses
+```
+
+### From Docker Compose v1 to v2
+```bash
+# OLD: docker-compose (deprecated)
+docker-compose up -d
+docker-compose logs -f
+
+# NEW: docker compose (recommended)
+docker compose up -d
+docker compose logs -f
+
+# Benefits:
+# ✅ Modern syntax
+# ✅ Better performance
+# ✅ Enhanced networking
+# ✅ Improved security
+```
+
+These patterns ensure consistent, reliable, and maintainable implementation across the entire codebase, from development to enterprise production deployment.

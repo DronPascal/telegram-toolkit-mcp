@@ -6,22 +6,22 @@ tool registration, and resource handling for Telegram message extraction.
 """
 
 import asyncio
-import signal
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
 
 try:
-    from mcp import FastMCP
+    from mcp.server import FastMCP
+    from starlette.responses import PlainTextResponse
 except ImportError:
     # Fallback for development
     FastMCP = None
+    PlainTextResponse = None
 
+from .core.monitoring import init_metrics
+from .core.tracing import init_tracing, shutdown_tracing
 from .utils.config import get_config, validate_telegram_credentials
 from .utils.logging import get_logger
-from .core.monitoring import init_metrics, get_metrics_collector
-from .core.tracing import init_tracing, shutdown_tracing, instrument_fastapi
 
 logger = get_logger(__name__)
 
@@ -117,7 +117,7 @@ class TelegramMCPServer:
             logger.info(
                 "Telegram client initialized successfully",
                 authorized=True,
-                user_id=self.telegram_client.session.user_id,
+                user_id=getattr(self.telegram_client.session, "user_id", None),
             )
 
         except ImportError:
@@ -135,7 +135,7 @@ class TelegramMCPServer:
                 await self.telegram_client.disconnect()
                 self.telegram_client = None
                 logger.info("Telegram client shutdown complete")
-            except Exception as e:
+            except Exception as e:  # type: ignore[BLE001]
                 logger.error("Error during Telegram client shutdown", error=str(e))
 
     @asynccontextmanager
@@ -155,6 +155,10 @@ class TelegramMCPServer:
                 logger.info("OpenTelemetry tracing initialized successfully")
             else:
                 logger.info("OpenTelemetry tracing disabled or not available")
+
+            # Create MCP server if not exists
+            if not self.mcp_server:
+                self.create_mcp_server()
 
             await self.initialize_telegram_client()
             self.metrics_collector.update_active_connections(1)
@@ -188,17 +192,12 @@ class TelegramMCPServer:
         # Create MCP server with lifespan management
         self.mcp_server = FastMCP(
             name="telegram-toolkit-mcp",
-            version="0.1.0",
-            description="Read-only MCP server for Telegram message history extraction",
+            instructions="Read-only MCP server for Telegram message history extraction",
             lifespan=self.lifespan,
         )
 
         # Register tools will be added here
         self._register_tools()
-
-        # Instrument FastAPI app for tracing
-        if hasattr(self.mcp_server, 'app'):
-            instrument_fastapi(self.mcp_server.app)
 
         logger.info("MCP server created and configured")
         return self.mcp_server
@@ -210,8 +209,8 @@ class TelegramMCPServer:
 
         try:
             # Import and register tools
-            from .tools.resolve_chat import resolve_chat_tool
             from .tools.fetch_history import fetch_history_tool
+            from .tools.resolve_chat import resolve_chat_tool
 
             # Register tools
             self.mcp_server.add_tool(resolve_chat_tool)
@@ -220,8 +219,8 @@ class TelegramMCPServer:
             # Register resource handlers
             self._register_resource_handlers()
 
-            # Add metrics endpoint
-            self._add_metrics_endpoint()
+            # Add custom routes to FastMCP server
+            self._add_custom_routes()
 
             logger.info("Successfully registered MCP tools and resources")
 
@@ -238,75 +237,256 @@ class TelegramMCPServer:
             return
 
         try:
-            from .core.ndjson_resources import MCPResourceAdapter, get_resource_manager
-
-            # Create resource adapter
-            resource_adapter = MCPResourceAdapter(get_resource_manager())
-
             # Note: Resource registration depends on FastMCP API
             # This would be implemented when integrating with actual MCP server
             logger.info("Resource handlers prepared (implementation depends on FastMCP API)")
 
-        except Exception as e:
+        except Exception as e:  # type: ignore[BLE001]
             logger.error("Failed to register resource handlers", error=str(e))
             # Don't raise here - resources are optional
 
-    def _add_metrics_endpoint(self) -> None:
-        """Add HTTP endpoint for Prometheus metrics."""
-        if not self.mcp_server:
-            return
+    def _add_custom_routes(self) -> None:
+        """Add custom routes to FastMCP server using @custom_route decorator."""
+        logger.info("🔧 Adding custom routes to FastMCP server...")
 
-        try:
-            # Add metrics endpoint using FastMCP's HTTP capabilities
-            # Note: This assumes FastMCP supports custom HTTP routes
-            # If not supported, metrics can be exposed via separate HTTP server
+        # Health check route
+        @self.mcp_server.custom_route("/health", methods=["GET"])
+        async def health_endpoint(request):
+            """Health check endpoint for load balancers and monitoring."""
+            logger.info("🏥 Health check requested")
+            return PlainTextResponse("OK", status_code=200)
 
-            @self.mcp_server.app.get("/metrics")
-            async def metrics_endpoint():
-                """Prometheus metrics endpoint."""
+        # Metrics route
+        @self.mcp_server.custom_route("/metrics", methods=["GET"])
+        async def metrics_endpoint(request):
+            """Prometheus metrics endpoint."""
+            logger.info("📊 Metrics requested")
+            try:
                 metrics_data, content_type = self.metrics_collector.get_metrics_response()
-                from fastapi import Response
+                from starlette.responses import Response
+
                 return Response(content=metrics_data, media_type=content_type)
+            except Exception as e:
+                logger.error(f"❌ Metrics collection error: {e}")
+                return PlainTextResponse("Metrics collection failed", status_code=500)
 
-            logger.info("Metrics endpoint added at /metrics")
+        # Simple tools API route
+        @self.mcp_server.custom_route("/api/tools", methods=["GET", "POST"])
+        async def simple_tools_api(request):
+            """Simple API endpoint that returns tools without MCP protocol."""
+            logger.info("🔧 Simple tools API called")
+            try:
+                # Get tools from MCP server
+                tools = []
+                if hasattr(self.mcp_server, "_tools"):
+                    for tool_name, tool_info in self.mcp_server._tools.items():
+                        tools.append(
+                            {
+                                "name": tool_name,
+                                "description": tool_info.description or "",
+                                "parameters": tool_info.inputSchema
+                                if hasattr(tool_info, "inputSchema")
+                                else {},
+                            }
+                        )
 
-        except Exception as e:
-            logger.warning("Failed to add metrics endpoint", error=str(e))
-            logger.info("Metrics available via get_metrics_collector().get_metrics()")
+                from starlette.responses import JSONResponse
 
-    async def run_server(self) -> None:
+                return JSONResponse({"tools": tools, "status": "success"})
+            except Exception as e:
+                logger.error(f"❌ Tools API error: {e}")
+                from starlette.responses import JSONResponse
+
+                return JSONResponse(
+                    {"tools": [], "status": "error", "error": str(e)}, status_code=500
+                )
+
+        logger.info("✅ Custom routes added to FastMCP server")
+        logger.info("✅ Health endpoint available at: /health")
+        logger.info("✅ Metrics endpoint available at: /metrics")
+        logger.info("✅ Simple API endpoint available at: /api/tools")
+
+    def run_server_sync(self) -> None:
         """
-        Run the MCP server with proper signal handling.
+        Run the MCP server synchronously with HTTP transport.
 
-        This method sets up signal handlers and runs the server until
-        interrupted or shutdown is requested.
+        This method runs the FastMCP server with streamable-http transport,
+        which is the recommended approach for HTTP-based MCP servers.
         """
         if not self.mcp_server:
             raise RuntimeError("MCP server not created. Call create_mcp_server() first.")
 
-        # Set up signal handlers
-        def signal_handler(signum: int, frame: Any) -> None:
-            logger.info(f"Received signal {signum}, initiating shutdown")
-            self._shutdown_event.set()
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
         try:
             logger.info(
-                "Starting MCP server", host=self.config.server.host, port=self.config.server.port
+                "Starting MCP server with streamable-http transport",
+                host=self.config.server.host,
+                port=self.config.server.port,
             )
 
-            # Run the MCP server
-            await self.mcp_server.run()
+            # Use streamable-http transport - check FastMCP version compatibility
+            logger.info("🚀 Running FastMCP with streamable-http transport...")
 
-        except asyncio.CancelledError:
-            logger.info("Server cancelled")
+            # Try different approaches based on FastMCP version
+            try:
+                # Try with host/port parameters (newer versions)
+                self.mcp_server.run(
+                    transport="streamable-http",
+                    host=self.config.server.host,
+                    port=self.config.server.port,
+                )
+            except TypeError as e:
+                if "unexpected keyword argument" in str(e):
+                    logger.warning(
+                        "FastMCP version doesn't support host/port parameters, using manual ASGI server"
+                    )
+                    # Use manual ASGI server with proper host/port configuration
+                    self._run_manual_asgi_server()
+                else:
+                    raise e
+
         except Exception as e:
-            logger.error("Server error", error=str(e))
+            logger.error("Failed to start FastMCP server", error=str(e))
+            logger.info("💡 Make sure FastMCP dependencies are properly installed")
+            logger.info("💡 Check that no other service is using the same port")
+            logger.info("💡 FastMCP version may not support streamable-http transport")
+
+            # Try alternative approach for older FastMCP versions
+            logger.info("🔄 Trying alternative approach for older FastMCP versions...")
+            try:
+                self._run_legacy_fastmcp()
+            except Exception as legacy_error:
+                logger.error(f"Legacy approach also failed: {legacy_error}")
+                logger.info("💡 Consider updating FastMCP to a newer version")
+                logger.info("💡 Or use the working custom endpoints on port 8001")
+                raise legacy_error
+
+    def _run_legacy_fastmcp(self) -> None:
+        """
+        Alternative approach for older FastMCP versions that don't support
+        host/port parameters or streamable-http transport.
+        """
+        logger.info("🔧 Starting FastMCP with legacy approach...")
+
+        # For older versions, try stdio transport with external web server
+        # This requires setting up a reverse proxy or separate web server
+        logger.info("📡 Using stdio transport (requires external web server)")
+
+        try:
+            # Try stdio transport (most compatible)
+            self.mcp_server.run(transport="stdio")
+        except Exception as stdio_error:
+            logger.error(f"Stdio transport failed: {stdio_error}")
+
+            # Last resort: try to create ASGI app manually
+            logger.info("🔄 Attempting manual ASGI app creation...")
+            try:
+                # Try to get the ASGI app
+                if hasattr(self.mcp_server, "app"):
+                    logger.info("✅ Found ASGI app, attempting manual server setup...")
+                    self._run_manual_asgi_server()
+                else:
+                    logger.error("❌ No ASGI app found in FastMCP instance")
+                    raise RuntimeError("FastMCP version incompatible - no ASGI app available")
+            except Exception as manual_error:
+                logger.error(f"Manual ASGI setup failed: {manual_error}")
+                raise manual_error
+
+    def _run_manual_asgi_server(self) -> None:
+        """
+        Manually run the ASGI app using uvicorn for FastMCP versions.
+        """
+        logger.info("🚀 Starting manual ASGI server...")
+
+        try:
+            import uvicorn
+            from fastmcp import FastMCP
+
+            # Try different ways to get ASGI app
+            asgi_app = None
+
+            # Method 1: FastMCP streamable_http_app (preferred for HTTP)
+            if hasattr(self.mcp_server, "streamable_http_app"):
+                asgi_app = self.mcp_server.streamable_http_app
+                logger.info("✅ ASGI app obtained via .streamable_http_app")
+
+            # Method 2: FastMCP sse_app (fallback)
+            elif hasattr(self.mcp_server, "sse_app"):
+                asgi_app = self.mcp_server.sse_app
+                logger.info("✅ ASGI app obtained via .sse_app")
+
+            # Method 3: Direct app attribute (legacy)
+            elif hasattr(self.mcp_server, "app"):
+                asgi_app = self.mcp_server.app
+                logger.info("✅ ASGI app obtained via .app attribute")
+
+            # Method 4: Try to create ASGI app
+            elif hasattr(self.mcp_server, "create_app"):
+                asgi_app = self.mcp_server.create_app()
+                logger.info("✅ ASGI app created via create_app()")
+
+            # Method 5: Check if mcp_server is already an ASGI app
+            elif hasattr(self.mcp_server, "__call__"):
+                asgi_app = self.mcp_server
+                logger.info("✅ Using mcp_server directly as ASGI app")
+
+            if asgi_app:
+                logger.info(
+                    f"🚀 Starting uvicorn on {self.config.server.host}:{self.config.server.port}"
+                )
+
+                # Run with uvicorn
+                uvicorn.run(
+                    asgi_app,
+                    host=self.config.server.host,
+                    port=self.config.server.port,
+                    log_level="info",
+                )
+            else:
+                logger.error("❌ Could not obtain ASGI app from FastMCP server")
+                logger.error(f"Available attributes: {dir(self.mcp_server)}")
+                raise AttributeError("No ASGI app available")
+
+        except ImportError as e:
+            logger.error(f"❌ Import error: {e}")
+            raise ImportError(f"Required packages not installed: {e}")
+        except Exception as e:
+            logger.error(f"❌ Manual ASGI server failed: {e}")
+            logger.error(f"FastMCP type: {type(self.mcp_server)}")
             raise
-        finally:
-            logger.info("Server stopped")
+
+    async def shutdown(self) -> None:
+        """
+        Gracefully shutdown the MCP server and its resources.
+
+        This method ensures proper cleanup of:
+        - Telegram client connections
+        - Metrics collector
+        - Tracing resources
+        """
+        logger.info("Initiating MCP server shutdown")
+
+        try:
+            # Set shutdown event
+            self._shutdown_event.set()
+
+            # Shutdown Telegram client
+            if self.telegram_client:
+                logger.info("Shutting down Telegram client")
+                await self.telegram_client.disconnect()
+                logger.info("Telegram client shutdown complete")
+
+            # Shutdown tracing
+            try:
+                await shutdown_tracing()
+                logger.info("Tracing shutdown complete")
+            except Exception as e:  # type: ignore[BLE001]
+                logger.warning("Tracing shutdown failed", error=str(e))
+
+            logger.info("Server shutdown complete")
+
+        except Exception as e:  # type: ignore[BLE001]
+            logger.error("Shutdown error", error=str(e))
+            raise
 
 
 def create_server() -> TelegramMCPServer:
@@ -319,7 +499,7 @@ def create_server() -> TelegramMCPServer:
     return TelegramMCPServer()
 
 
-async def main() -> None:
+def main() -> None:
     """
     Main entry point for running the MCP server.
 
@@ -330,18 +510,18 @@ async def main() -> None:
         server = create_server()
 
         # Create MCP server instance
-        mcp_server = server.create_mcp_server()
+        server.create_mcp_server()
 
-        # Run the server
-        await server.run_server()
+        # Run the server with HTTP transport
+        server.run_server_sync()
 
     except KeyboardInterrupt:
         logger.info("Server interrupted by user")
-    except Exception as e:
+    except Exception as e:  # type: ignore[BLE001]
         logger.error("Fatal server error", error=str(e))
         sys.exit(1)
 
 
 if __name__ == "__main__":
     # Run the server
-    asyncio.run(main())
+    main()

@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+import pytest_asyncio
 from dotenv import load_dotenv
 
 # Load test environment
@@ -35,6 +36,7 @@ def temp_dir() -> Generator[Path, None, None]:
 def error_tracker():
     """Error tracker fixture for tests."""
     from src.telegram_toolkit_mcp.core.error_handler import ErrorTracker
+
     return ErrorTracker()
 
 
@@ -473,3 +475,89 @@ def e2e_cleanup_config():
         "connection_cleanup": True,
         "resource_cleanup_timeout": 5,  # seconds
     }
+
+
+@pytest_asyncio.fixture
+async def mcp_server():
+    """MCP server instance for testing."""
+    from telegram_toolkit_mcp.server import TelegramMCPServer
+
+    # Create server (configuration loaded automatically from environment)
+    server = TelegramMCPServer()
+
+    # Use lifespan context manager for proper startup/shutdown
+    async with server.lifespan():
+        yield server
+
+
+@pytest_asyncio.fixture
+async def http_server():
+    """HTTP server instance for E2E testing."""
+    import asyncio
+    import os
+    import time
+
+    from telegram_toolkit_mcp.server import TelegramMCPServer
+
+    server = TelegramMCPServer()
+
+    # Start HTTP server as subprocess
+    server_ready_file = f"/tmp/mcp_server_ready_{os.getpid()}"
+
+    # Remove ready file if exists
+    if os.path.exists(server_ready_file):
+        os.remove(server_ready_file)
+
+    def run_http_server():
+        """Run HTTP server as subprocess."""
+        try:
+            # Create new event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def start_server():
+                async with server.lifespan():
+                    # Signal that server is ready
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, lambda: open(server_ready_file, "w").__enter__().write("ready")
+                    )
+                    # Run HTTP server
+                    server.run_server_sync()
+
+            # Run the server
+            loop.run_until_complete(start_server())
+        except Exception as e:  # type: ignore[BLE001]
+            print(f"HTTP server subprocess error: {e}")
+        finally:
+            # Cleanup ready file
+            if os.path.exists(server_ready_file):
+                os.remove(server_ready_file)
+
+    # Start server in background thread with new event loop
+    import threading
+
+    def start_server_thread():
+        """Start server in separate thread with new event loop."""
+        server_thread = threading.Thread(target=run_http_server, daemon=True)
+        server_thread.start()
+        return server_thread
+
+    start_server_thread()
+
+    # Wait for server to be ready (with timeout)
+    timeout = 20
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if os.path.exists(server_ready_file):
+            # Give server a moment to fully initialize
+            await asyncio.sleep(1)
+            yield server
+            # Cleanup
+            if os.path.exists(server_ready_file):
+                os.remove(server_ready_file)
+            return
+        await asyncio.sleep(0.1)
+
+    # Timeout reached
+    raise RuntimeError(f"HTTP server failed to start within {timeout} seconds")
