@@ -6,19 +6,20 @@ and optimization capabilities for enterprise-grade production deployment.
 """
 
 import asyncio
-import time
-import statistics
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Callable
-from contextlib import asynccontextmanager
-import psutil
 import gc
+import statistics
+import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Any
 
-from .tracing import get_tracer, add_span_attribute, add_span_event
-from .monitoring import get_metrics_collector, record_tool_success, record_tool_error
+import psutil
+
 from ..utils.logging import get_logger
-
+from .monitoring import get_metrics_collector
+from .tracing import get_tracer
 
 logger = get_logger(__name__)
 
@@ -31,13 +32,13 @@ class PerformanceMetrics:
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
-    response_times: List[float] = field(default_factory=list)
-    error_rates: List[float] = field(default_factory=list)
+    response_times: list[float] = field(default_factory=list)
+    error_rates: list[float] = field(default_factory=list)
     throughput_rps: float = 0.0
     p50_latency: float = 0.0
     p95_latency: float = 0.0
     p99_latency: float = 0.0
-    min_latency: float = float('inf')
+    min_latency: float = float("inf")
     max_latency: float = 0.0
     memory_usage_mb: float = 0.0
     cpu_usage_percent: float = 0.0
@@ -81,7 +82,7 @@ class PerformanceMetrics:
             return error_rate
         return 0.0
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get performance summary."""
         self.calculate_percentiles()
 
@@ -98,10 +99,10 @@ class PerformanceMetrics:
                 "p50": self.p50_latency * 1000,
                 "p95": self.p95_latency * 1000,
                 "p99": self.p99_latency * 1000,
-                "avg": statistics.mean(self.response_times) * 1000 if self.response_times else 0
+                "avg": statistics.mean(self.response_times) * 1000 if self.response_times else 0,
             },
             "memory_usage_mb": self.memory_usage_mb,
-            "cpu_usage_percent": self.cpu_usage_percent
+            "cpu_usage_percent": self.cpu_usage_percent,
         }
 
 
@@ -112,7 +113,7 @@ class LoadTestConfig:
     duration_seconds: int = 60
     concurrent_users: int = 10
     ramp_up_seconds: int = 10
-    target_rps: Optional[int] = None
+    target_rps: int | None = None
     request_timeout: float = 30.0
     collect_system_metrics: bool = True
     enable_tracing: bool = False
@@ -128,10 +129,7 @@ class PerformanceProfiler:
 
     @asynccontextmanager
     async def profile_operation(
-        self,
-        operation_name: str,
-        collect_memory: bool = True,
-        collect_cpu: bool = True
+        self, operation_name: str, collect_memory: bool = True, collect_cpu: bool = True
     ):
         """Profile an operation with comprehensive metrics."""
         start_time = time.time()
@@ -143,8 +141,8 @@ class PerformanceProfiler:
             attributes={
                 "operation.name": operation_name,
                 "profiling.memory": collect_memory,
-                "profiling.cpu": collect_cpu
-            }
+                "profiling.cpu": collect_cpu,
+            },
         ) as span:
             try:
                 yield span
@@ -169,7 +167,7 @@ class PerformanceProfiler:
                     f"Operation '{operation_name}' completed",
                     duration_seconds=duration,
                     memory_delta_mb=memory_delta,
-                    cpu_delta_percent=cpu_delta
+                    cpu_delta_percent=cpu_delta,
                 )
 
             except Exception as e:
@@ -178,10 +176,7 @@ class PerformanceProfiler:
                 raise
 
     async def benchmark_operation(
-        self,
-        operation: Callable,
-        iterations: int = 100,
-        warmup_iterations: int = 10
+        self, operation: Callable, iterations: int = 100, warmup_iterations: int = 10
     ) -> PerformanceMetrics:
         """Benchmark an operation with statistical analysis."""
         logger.info(f"Benchmarking operation with {iterations} iterations")
@@ -234,10 +229,8 @@ class LoadTester:
         self.tracer = get_tracer("load_tester")
 
     async def run_load_test(
-        self,
-        operations: List[Callable],
-        operation_weights: Optional[List[float]] = None
-    ) -> Dict[str, PerformanceMetrics]:
+        self, operations: list[Callable], operation_weights: list[float] | None = None
+    ) -> dict[str, PerformanceMetrics]:
         """Run comprehensive load test."""
         logger.info("Starting load test", config=self.config.__dict__)
 
@@ -313,22 +306,20 @@ class LoadTester:
         logger.info(
             "Load test completed",
             total_duration_seconds=total_duration,
-            operations_tested=len(operations)
+            operations_tested=len(operations),
         )
 
         return operation_metrics
 
-    def _select_operation(self, operations: List[Callable], weights: List[float]) -> Callable:
+    def _select_operation(self, operations: list[Callable], weights: list[float]) -> Callable:
         """Select operation based on weights."""
         import random
+
         return random.choices(operations, weights=weights)[0]
 
     async def run_stress_test(
-        self,
-        operation: Callable,
-        max_concurrent: int = 100,
-        step_size: int = 10
-    ) -> List[PerformanceMetrics]:
+        self, operation: Callable, max_concurrent: int = 100, step_size: int = 10
+    ) -> list[PerformanceMetrics]:
         """Run stress test with increasing concurrency."""
         logger.info(f"Starting stress test up to {max_concurrent} concurrent users")
 
@@ -340,7 +331,7 @@ class LoadTester:
             config = LoadTestConfig(
                 duration_seconds=30,  # Shorter duration for stress test
                 concurrent_users=concurrent,
-                ramp_up_seconds=5
+                ramp_up_seconds=5,
             )
 
             stress_tester = LoadTester(config)
@@ -374,7 +365,7 @@ class PerformanceOptimizer:
         """Set baseline performance metrics."""
         self.baseline_metrics[operation_name] = metrics
 
-    def analyze_performance(self, current_metrics: PerformanceMetrics) -> Dict[str, Any]:
+    def analyze_performance(self, current_metrics: PerformanceMetrics) -> dict[str, Any]:
         """Analyze performance against baseline."""
         if current_metrics.operation_name not in self.baseline_metrics:
             return {"status": "no_baseline", "recommendations": []}
@@ -385,7 +376,7 @@ class PerformanceOptimizer:
             "operation": current_metrics.operation_name,
             "status": "ok",
             "recommendations": [],
-            "comparisons": {}
+            "comparisons": {},
         }
 
         # Compare key metrics
@@ -393,7 +384,7 @@ class PerformanceOptimizer:
             "latency_p50": (current_metrics.p50_latency, baseline.p50_latency),
             "latency_p95": (current_metrics.p95_latency, baseline.p95_latency),
             "throughput": (current_metrics.throughput_rps, baseline.throughput_rps),
-            "error_rate": (current_metrics.calculate_error_rate(), baseline.calculate_error_rate())
+            "error_rate": (current_metrics.calculate_error_rate(), baseline.calculate_error_rate()),
         }
 
         analysis["comparisons"] = comparisons
@@ -403,45 +394,51 @@ class PerformanceOptimizer:
 
         # Latency analysis
         if current_metrics.p95_latency > baseline.p95_latency * 1.5:
-            recommendations.append({
-                "type": "latency",
-                "severity": "high",
-                "message": ".2f",
-                "suggestions": [
-                    "Consider optimizing database queries",
-                    "Implement response caching",
-                    "Review network latency",
-                    "Check for memory leaks"
-                ]
-            })
+            recommendations.append(
+                {
+                    "type": "latency",
+                    "severity": "high",
+                    "message": ".2f",
+                    "suggestions": [
+                        "Consider optimizing database queries",
+                        "Implement response caching",
+                        "Review network latency",
+                        "Check for memory leaks",
+                    ],
+                }
+            )
 
         # Throughput analysis
         if current_metrics.throughput_rps < baseline.throughput_rps * 0.8:
-            recommendations.append({
-                "type": "throughput",
-                "severity": "medium",
-                "message": ".2f",
-                "suggestions": [
-                    "Optimize concurrent request handling",
-                    "Implement request queuing",
-                    "Review resource allocation",
-                    "Consider horizontal scaling"
-                ]
-            })
+            recommendations.append(
+                {
+                    "type": "throughput",
+                    "severity": "medium",
+                    "message": ".2f",
+                    "suggestions": [
+                        "Optimize concurrent request handling",
+                        "Implement request queuing",
+                        "Review resource allocation",
+                        "Consider horizontal scaling",
+                    ],
+                }
+            )
 
         # Error rate analysis
         if current_metrics.calculate_error_rate() > baseline.calculate_error_rate() * 2:
-            recommendations.append({
-                "type": "reliability",
-                "severity": "high",
-                "message": ".1f",
-                "suggestions": [
-                    "Review error handling logic",
-                    "Check for resource exhaustion",
-                    "Implement circuit breaker pattern",
-                    "Add comprehensive logging"
-                ]
-            })
+            recommendations.append(
+                {
+                    "type": "reliability",
+                    "severity": "high",
+                    "message": ".1f",
+                    "suggestions": [
+                        "Review error handling logic",
+                        "Check for resource exhaustion",
+                        "Implement circuit breaker pattern",
+                        "Add comprehensive logging",
+                    ],
+                }
+            )
 
         analysis["recommendations"] = recommendations
 
@@ -453,7 +450,7 @@ class PerformanceOptimizer:
 
         return analysis
 
-    def generate_optimization_report(self, analyses: Dict[str, Dict]) -> str:
+    def generate_optimization_report(self, analyses: dict[str, dict]) -> str:
         """Generate comprehensive optimization report."""
         report_lines = [
             "# Performance Optimization Report",
@@ -461,47 +458,57 @@ class PerformanceOptimizer:
             f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
             "",
             "## Summary",
-            ""
+            "",
         ]
 
         critical_count = sum(1 for a in analyses.values() if a.get("status") == "critical")
         warning_count = sum(1 for a in analyses.values() if a.get("status") == "warning")
         ok_count = sum(1 for a in analyses.values() if a.get("status") == "ok")
 
-        report_lines.extend([
-            f"- Critical Issues: {critical_count}",
-            f"- Warning Issues: {warning_count}",
-            f"- OK Operations: {ok_count}",
-            "",
-            "## Detailed Analysis",
-            ""
-        ])
+        report_lines.extend(
+            [
+                f"- Critical Issues: {critical_count}",
+                f"- Warning Issues: {warning_count}",
+                f"- OK Operations: {ok_count}",
+                "",
+                "## Detailed Analysis",
+                "",
+            ]
+        )
 
         for operation, analysis in analyses.items():
-            report_lines.extend([
-                f"### {operation}",
-                "",
-                f"**Status:** {analysis.get('status', 'unknown').upper()}",
-                "",
-                "#### Key Metrics",
-            ])
+            report_lines.extend(
+                [
+                    f"### {operation}",
+                    "",
+                    f"**Status:** {analysis.get('status', 'unknown').upper()}",
+                    "",
+                    "#### Key Metrics",
+                ]
+            )
 
             comparisons = analysis.get("comparisons", {})
             for metric, (current, baseline) in comparisons.items():
                 change = ((current - baseline) / baseline * 100) if baseline > 0 else 0
-                report_lines.append(f"- {metric}: {current:.2f} (vs {baseline:.2f}, {change:+.1f}%)")
+                report_lines.append(
+                    f"- {metric}: {current:.2f} (vs {baseline:.2f}, {change:+.1f}%)"
+                )
 
             recommendations = analysis.get("recommendations", [])
             if recommendations:
-                report_lines.extend([
-                    "",
-                    "#### Recommendations",
-                ])
+                report_lines.extend(
+                    [
+                        "",
+                        "#### Recommendations",
+                    ]
+                )
                 for rec in recommendations:
-                    report_lines.extend([
-                        f"- **{rec['type'].upper()}** ({rec['severity']}): {rec['message']}",
-                        f"  - Suggestions: {', '.join(rec['suggestions'])}"
-                    ])
+                    report_lines.extend(
+                        [
+                            f"- **{rec['type'].upper()}** ({rec['severity']}): {rec['message']}",
+                            f"  - Suggestions: {', '.join(rec['suggestions'])}",
+                        ]
+                    )
 
             report_lines.append("")
 
@@ -537,11 +544,7 @@ def profile_sync(func: Callable, *args, **kwargs) -> Any:
 
 
 async def benchmark_async(
-    func: Callable,
-    iterations: int = 100,
-    warmup_iterations: int = 10,
-    *args,
-    **kwargs
+    func: Callable, iterations: int = 100, warmup_iterations: int = 10, *args, **kwargs
 ) -> PerformanceMetrics:
     """Benchmark an async function."""
     profiler = get_performance_profiler()
@@ -553,11 +556,7 @@ async def benchmark_async(
 
 
 def benchmark_sync(
-    func: Callable,
-    iterations: int = 100,
-    warmup_iterations: int = 10,
-    *args,
-    **kwargs
+    func: Callable, iterations: int = 100, warmup_iterations: int = 10, *args, **kwargs
 ) -> PerformanceMetrics:
     """Benchmark a sync function."""
     profiler = get_performance_profiler()
@@ -571,15 +570,12 @@ def benchmark_sync(
         with ThreadPoolExecutor() as executor:
             return await loop.run_in_executor(executor, operation)
 
-    return asyncio.run(
-        profiler.benchmark_operation(async_operation, iterations, warmup_iterations)
-    )
+    return asyncio.run(profiler.benchmark_operation(async_operation, iterations, warmup_iterations))
 
 
 async def run_load_test(
-    operations: List[Callable],
-    config: Optional[LoadTestConfig] = None
-) -> Dict[str, PerformanceMetrics]:
+    operations: list[Callable], config: LoadTestConfig | None = None
+) -> dict[str, PerformanceMetrics]:
     """Run load test with default configuration."""
     if config is None:
         config = LoadTestConfig()
@@ -591,9 +587,9 @@ async def run_load_test(
 async def run_stress_test(
     operation: Callable,
     max_concurrent: int = 100,
-    config: Optional[LoadTestConfig] = None,
-    step_size: int = 5
-) -> List[PerformanceMetrics]:
+    config: LoadTestConfig | None = None,
+    step_size: int = 5,
+) -> list[PerformanceMetrics]:
     """Run stress test with default configuration.
 
     Args:

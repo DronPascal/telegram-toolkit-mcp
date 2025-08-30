@@ -34,6 +34,7 @@ sys.path.insert(0, str(src_path))
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+
 from telegram_toolkit_mcp.utils.config import get_config
 
 
