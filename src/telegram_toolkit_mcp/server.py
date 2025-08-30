@@ -283,59 +283,38 @@ class TelegramMCPServer:
                 logger.error(f"❌ Metrics collection error: {e}")
                 return PlainTextResponse("Metrics collection failed", status_code=500)
 
-        # MCP test endpoint (non-SSE version for compatibility)
-        @self.mcp_server.custom_route("/mcp/test", methods=["GET"])
-        async def mcp_test_endpoint(request):
-            """Simple MCP test endpoint without SSE for compatibility."""
-            logger.info("🧪 MCP test endpoint requested")
+        # Debug headers endpoint
+        @self.mcp_server.custom_route("/debug/headers", methods=["GET"])
+        async def debug_headers_endpoint(request):
+            """Debug endpoint that shows request headers."""
+            logger.info("🐛 Debug headers requested")
             from starlette.responses import JSONResponse
-            from datetime import datetime, timezone
+
+            headers = dict(request.headers)
+            # Mask sensitive headers
+            sensitive = ["authorization", "cookie", "x-api-key"]
+            for key in sensitive:
+                if key in headers:
+                    headers[key] = "***masked***"
+
+            from datetime import datetime
 
             return JSONResponse(
                 {
                     "status": "ok",
-                    "message": "MCP server is running",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "endpoints": {"mcp": "/mcp (SSE)", "health": "/health", "metrics": "/metrics"},
-                    "note": "Use /mcp endpoint for full MCP protocol with SSE support",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "headers": headers,
+                    "method": request.method,
+                    "url": str(request.url),
+                    "client": request.client.host if request.client else None,
                 }
             )
-
-        # Simple tools API route
-        @self.mcp_server.custom_route("/api/tools", methods=["GET", "POST"])
-        async def simple_tools_api(request):
-            """Simple API endpoint that returns tools without MCP protocol."""
-            logger.info("🔧 Simple tools API called")
-            try:
-                # Get tools from MCP server
-                tools = []
-                if hasattr(self.mcp_server, "_tools"):
-                    for tool_name, tool_info in self.mcp_server._tools.items():
-                        tools.append(
-                            {
-                                "name": tool_name,
-                                "description": tool_info.description or "",
-                                "parameters": tool_info.inputSchema
-                                if hasattr(tool_info, "inputSchema")
-                                else {},
-                            }
-                        )
-
-                from starlette.responses import JSONResponse
-
-                return JSONResponse({"tools": tools, "status": "success"})
-            except Exception as e:
-                logger.error(f"❌ Tools API error: {e}")
-                from starlette.responses import JSONResponse
-
-                return JSONResponse(
-                    {"tools": [], "status": "error", "error": str(e)}, status_code=500
-                )
 
         logger.info("✅ Custom routes added to FastMCP server")
         logger.info("✅ Health endpoint available at: /health")
         logger.info("✅ Metrics endpoint available at: /metrics")
-        logger.info("✅ Simple API endpoint available at: /api/tools")
+        logger.info("✅ Debug headers endpoint available at: /debug/headers")
+        logger.info("✅ MCP endpoint available at: /mcp (SSE)")
 
     def run_server_sync(self) -> None:
         """
