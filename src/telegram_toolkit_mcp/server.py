@@ -336,9 +336,12 @@ class TelegramMCPServer:
             logger.info("🚀 Running FastMCP with streamable-http transport...")
 
             # FastMCP 0.9.0 doesn't support host/port parameters in run()
-            # Use manual ASGI server approach for proper host/port configuration
-            logger.info("Using manual ASGI server for FastMCP 0.9.0 compatibility")
-            self._run_manual_asgi_server()
+            # But we MUST use run() to initialize Task Group properly
+            logger.info("Using FastMCP.run() for proper Task Group initialization")
+            
+            # Use streamable-http transport with FastMCP's run method
+            # This properly initializes the Task Group that was causing 500 errors
+            self.mcp_server.run(transport="streamable-http")
 
         except Exception as e:
             logger.error("Failed to start FastMCP server", error=str(e))
