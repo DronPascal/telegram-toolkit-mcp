@@ -8,7 +8,6 @@ including timeouts, dependencies, and test-specific settings.
 
 import os
 from pathlib import Path
-from typing import Dict, List, Set
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -22,11 +21,11 @@ E2E_TESTS = TESTS_PATH / "e2e"
 
 # Default timeouts (seconds)
 TIMEOUTS = {
-    "unit": 60,          # 1 minute
+    "unit": 60,  # 1 minute
     "integration": 120,  # 2 minutes
-    "e2e": 300,         # 5 minutes
-    "performance": 600, # 10 minutes
-    "overall": 1800,    # 30 minutes total
+    "e2e": 300,  # 5 minutes
+    "performance": 600,  # 10 minutes
+    "overall": 1800,  # 30 minutes total
 }
 
 # Test dependencies by category
@@ -34,7 +33,7 @@ DEPENDENCIES = {
     "basic": ["pytest", "pytest_asyncio", "pytest_cov"],
     "e2e": ["telethon", "mcp", "httpx", "aiohttp"],
     "performance": ["psutil", "memory_profiler"],
-    "optional": ["python-dotenv", "rich", "tabulate"]
+    "optional": ["python-dotenv", "rich", "tabulate"],
 }
 
 # Environment variables required for different test types
@@ -42,7 +41,7 @@ REQUIRED_ENV_VARS = {
     "e2e": ["TELEGRAM_API_ID", "TELEGRAM_API_HASH"],
     "performance": [],  # No specific requirements
     "integration": [],  # No specific requirements
-    "unit": []          # No specific requirements
+    "unit": [],  # No specific requirements
 }
 
 # Test patterns for different categories
@@ -50,7 +49,7 @@ TEST_PATTERNS = {
     "unit": ["test_*.py", "*_test.py"],
     "integration": ["test_*integration*.py", "*_integration_test.py"],
     "e2e": ["test_*e2e*.py", "*_e2e_test.py"],
-    "performance": ["test_*performance*.py", "*_performance_test.py"]
+    "performance": ["test_*performance*.py", "*_performance_test.py"],
 }
 
 # Pytest configuration
@@ -60,7 +59,7 @@ PYTEST_CONFIG = {
         "--strict-config",
         "--asyncio-mode=auto",
         "--tb=short",
-        "--disable-warnings"
+        "--disable-warnings",
     ],
     "markers": [
         "unit: Unit tests",
@@ -68,13 +67,11 @@ PYTEST_CONFIG = {
         "e2e: End-to-end tests",
         "performance: Performance tests",
         "slow: Slow running tests",
-        "flaky: Potentially unstable tests"
+        "flaky: Potentially unstable tests",
     ],
-    "filterwarnings": [
-        "ignore::DeprecationWarning",
-        "ignore::PendingDeprecationWarning"
-    ]
+    "filterwarnings": ["ignore::DeprecationWarning", "ignore::PendingDeprecationWarning"],
 }
+
 
 class TestConfig:
     """Centralized test configuration."""
@@ -99,6 +96,7 @@ class TestConfig:
         if env_file.exists():
             try:
                 from dotenv import load_dotenv
+
                 load_dotenv(env_file)
             except ImportError:
                 pass  # python-dotenv not available
@@ -107,7 +105,7 @@ class TestConfig:
         """Get timeout for specific test type."""
         return TIMEOUTS.get(test_type, TIMEOUTS["unit"])
 
-    def get_dependencies(self, test_type: str) -> List[str]:
+    def get_dependencies(self, test_type: str) -> list[str]:
         """Get required dependencies for test type."""
         deps = DEPENDENCIES["basic"].copy()
 
@@ -116,7 +114,7 @@ class TestConfig:
 
         return deps
 
-    def check_dependencies(self, test_type: str) -> List[str]:
+    def check_dependencies(self, test_type: str) -> list[str]:
         """Check if required dependencies are installed."""
         import importlib.util
 
@@ -129,11 +127,11 @@ class TestConfig:
 
         return missing
 
-    def get_required_env_vars(self, test_type: str) -> List[str]:
+    def get_required_env_vars(self, test_type: str) -> list[str]:
         """Get required environment variables for test type."""
         return REQUIRED_ENV_VARS.get(test_type, [])
 
-    def check_environment(self, test_type: str) -> List[str]:
+    def check_environment(self, test_type: str) -> list[str]:
         """Check if required environment variables are set."""
         required = self.get_required_env_vars(test_type)
         missing = []
@@ -144,8 +142,9 @@ class TestConfig:
 
         return missing
 
-    def get_pytest_args(self, test_type: str, verbose: bool = False,
-                       fail_fast: bool = False) -> List[str]:
+    def get_pytest_args(
+        self, test_type: str, verbose: bool = False, fail_fast: bool = False
+    ) -> list[str]:
         """Get pytest command line arguments for test type."""
         args = ["-m", "pytest"]
 
@@ -169,25 +168,24 @@ class TestConfig:
 
         return args
 
-    def get_test_paths(self, test_type: str) -> List[Path]:
+    def get_test_paths(self, test_type: str) -> list[Path]:
         """Get test file paths for test type."""
         base_paths = {
             "unit": [self.unit_tests],
             "integration": [self.integration_tests],
             "e2e": [self.e2e_tests],
-            "performance": [self.unit_tests, self.integration_tests, self.e2e_tests]  # Performance tests in all dirs
+            "performance": [
+                self.unit_tests,
+                self.integration_tests,
+                self.e2e_tests,
+            ],  # Performance tests in all dirs
         }
 
         return base_paths.get(test_type, [])
 
-    def is_test_ready(self, test_type: str) -> Dict[str, any]:
+    def is_test_ready(self, test_type: str) -> dict[str, any]:
         """Check if test type is ready to run."""
-        result = {
-            "ready": True,
-            "missing_deps": [],
-            "missing_env": [],
-            "warnings": []
-        }
+        result = {"ready": True, "missing_deps": [], "missing_env": [], "warnings": []}
 
         # Check dependencies
         missing_deps = self.check_dependencies(test_type)
@@ -211,7 +209,7 @@ class TestConfig:
 
         return result
 
-    def get_environment_vars(self) -> Dict[str, str]:
+    def get_environment_vars(self) -> dict[str, str]:
         """Get environment variables for test execution."""
         env = os.environ.copy()
         env["PYTHONPATH"] = str(self.src_path)
@@ -220,8 +218,10 @@ class TestConfig:
 
         return env
 
+
 # Global configuration instance
 config = TestConfig()
+
 
 def get_test_config() -> TestConfig:
     """Get global test configuration instance."""

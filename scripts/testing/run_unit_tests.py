@@ -6,7 +6,6 @@ This script runs unit tests with proper configuration and environment setup.
 Unit tests are fast, isolated tests that validate individual components.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -27,13 +26,7 @@ def run_unit_tests(verbose: bool = False, fail_fast: bool = False) -> tuple[int,
     print("🧪 Running Unit Tests...")
 
     # Build pytest command
-    cmd = [
-        "pytest",
-        "tests/unit/",
-        "--tb=short",
-        "-v" if verbose else "-q",
-        "--asyncio-mode=auto"
-    ]
+    cmd = ["pytest", "tests/unit/", "--tb=short", "-v" if verbose else "-q", "--asyncio-mode=auto"]
 
     if fail_fast:
         cmd.append("--maxfail=1")
@@ -48,7 +41,8 @@ def run_unit_tests(verbose: bool = False, fail_fast: bool = False) -> tuple[int,
             env=env,
             capture_output=True,
             text=True,
-            timeout=test_config.get_timeout("unit")
+            timeout=test_config.get_timeout("unit"),
+            check=False,
         )
 
         return result.returncode, result.stdout + result.stderr

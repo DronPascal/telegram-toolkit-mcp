@@ -6,7 +6,6 @@ This script runs integration tests with proper configuration and environment set
 Integration tests validate component interactions and data flow between modules.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -32,7 +31,7 @@ def run_integration_tests(verbose: bool = False, fail_fast: bool = False) -> tup
         "tests/integration/",
         "--tb=short",
         "-v" if verbose else "-q",
-        "--asyncio-mode=auto"
+        "--asyncio-mode=auto",
     ]
 
     if fail_fast:
@@ -48,13 +47,16 @@ def run_integration_tests(verbose: bool = False, fail_fast: bool = False) -> tup
             env=env,
             capture_output=True,
             text=True,
-            timeout=test_config.get_timeout("integration")
+            timeout=test_config.get_timeout("integration"),
+            check=False,
         )
 
         return result.returncode, result.stdout + result.stderr
 
     except subprocess.TimeoutExpired:
-        error_msg = f"Integration tests timed out after {test_config.get_timeout('integration')} seconds"
+        error_msg = (
+            f"Integration tests timed out after {test_config.get_timeout('integration')} seconds"
+        )
         return 1, error_msg
     except Exception as e:
         return 1, f"Error running integration tests: {e}"

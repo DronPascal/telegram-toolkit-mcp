@@ -29,10 +29,7 @@ class PodmanServerRunner:
         """Check if Podman is installed and available"""
         try:
             result = subprocess.run(
-                ["podman", "--version"],
-                capture_output=True,
-                text=True,
-                check=True
+                ["podman", "--version"], capture_output=True, text=True, check=True
             )
             print(f"✅ Podman available: {result.stdout.strip()}")
             return True
@@ -50,7 +47,7 @@ class PodmanServerRunner:
                 ["podman", "images", "telegram-toolkit-mcp:latest"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             if "telegram-toolkit-mcp" in result.stdout:
                 print("✅ Docker image found: telegram-toolkit-mcp:latest")
@@ -67,13 +64,16 @@ class PodmanServerRunner:
         print("🔨 Building Docker image with Podman...")
         try:
             cmd = [
-                "podman", "build",
-                "-t", "telegram-toolkit-mcp:latest",
-                "-f", str(self.project_root / "Dockerfile"),
-                str(self.project_root)
+                "podman",
+                "build",
+                "-t",
+                "telegram-toolkit-mcp:latest",
+                "-f",
+                str(self.project_root / "Dockerfile"),
+                str(self.project_root),
             ]
 
-            result = subprocess.run(cmd, cwd=self.project_root)
+            result = subprocess.run(cmd, cwd=self.project_root, check=False)
             if result.returncode == 0:
                 print("✅ Docker image built successfully")
                 return True
@@ -94,6 +94,7 @@ class PodmanServerRunner:
         if env_file.exists():
             try:
                 from dotenv import load_dotenv
+
                 load_dotenv(env_file)
                 print("✅ Loaded environment from .env file")
             except ImportError:
@@ -139,7 +140,8 @@ class PodmanServerRunner:
             result = subprocess.run(
                 ["podman", "ps", "-a", "--filter", f"name={self.container_name}"],
                 capture_output=True,
-                text=True
+                text=True,
+                check=False,
             )
 
             if self.container_name in result.stdout:
@@ -150,7 +152,9 @@ class PodmanServerRunner:
         except Exception as e:
             print(f"⚠️  Error stopping existing container: {e}")
 
-    def run_server(self, transport: str, host: str = "0.0.0.0", port: int = 8000, detached: bool = False):
+    def run_server(
+        self, transport: str, host: str = "0.0.0.0", port: int = 8000, detached: bool = False
+    ):
         """Run the MCP server with specified transport"""
         print(f"🚀 Starting Telegram Toolkit MCP Server with {transport} transport")
 
@@ -159,10 +163,14 @@ class PodmanServerRunner:
 
         # Build command
         cmd = [
-            "podman", "run",
-            "--name", self.container_name,
-            "-p", f"0.0.0.0:{port}:{port}",  # Explicitly publish to 0.0.0.0 for external access
-            "--network", "host",  # Use host network for better connectivity
+            "podman",
+            "run",
+            "--name",
+            self.container_name,
+            "-p",
+            f"0.0.0.0:{port}:{port}",  # Explicitly publish to 0.0.0.0 for external access
+            "--network",
+            "host",  # Use host network for better connectivity
         ]
 
         # Add environment variables
@@ -174,22 +182,33 @@ class PodmanServerRunner:
         data_dir.mkdir(exist_ok=True)
         logs_dir.mkdir(exist_ok=True)
 
-        cmd.extend([
-            "-v", f"{data_dir}:/app/data:rw,Z",
-            "-v", f"{logs_dir}:/app/logs:rw,Z",
-        ])
+        cmd.extend(
+            [
+                "-v",
+                f"{data_dir}:/app/data:rw,Z",
+                "-v",
+                f"{logs_dir}:/app/logs:rw,Z",
+            ]
+        )
 
         if detached:
             cmd.append("-d")
 
         # Add image and command
-        cmd.extend([
-            "telegram-toolkit-mcp:latest",
-            "python", "-m", "telegram_toolkit_mcp.server",
-            "--transport", transport,
-            "--host", host,
-            "--port", str(port)
-        ])
+        cmd.extend(
+            [
+                "telegram-toolkit-mcp:latest",
+                "python",
+                "-m",
+                "telegram_toolkit_mcp.server",
+                "--transport",
+                transport,
+                "--host",
+                host,
+                "--port",
+                str(port),
+            ]
+        )
 
         print(f"📋 Running command: {' '.join(cmd)}")
         print(f"🌐 Server will be accessible at: http://{host}:{port}")
@@ -200,13 +219,15 @@ class PodmanServerRunner:
         print(f"   • SSE: http://{host}:{port}/sse")
 
         if detached:
-            print("🎯 Running in detached mode (use 'podman logs -f telegram-toolkit-mcp' to see logs)")
+            print(
+                "🎯 Running in detached mode (use 'podman logs -f telegram-toolkit-mcp' to see logs)"
+            )
         else:
             print("🎯 Running in foreground mode (Ctrl+C to stop)")
 
         # Run the container
         try:
-            subprocess.run(cmd, cwd=self.project_root)
+            subprocess.run(cmd, cwd=self.project_root, check=False)
         except KeyboardInterrupt:
             print("\n🛑 Stopping server...")
             self.stop_existing_container()
@@ -219,7 +240,7 @@ class PodmanServerRunner:
     def show_logs(self):
         """Show container logs"""
         try:
-            subprocess.run(["podman", "logs", "-f", self.container_name])
+            subprocess.run(["podman", "logs", "-f", self.container_name], check=False)
         except Exception as e:
             print(f"❌ Error showing logs: {e}")
 
@@ -229,7 +250,8 @@ class PodmanServerRunner:
             result = subprocess.run(
                 ["podman", "ps", "-a", "--filter", f"name={self.container_name}"],
                 capture_output=True,
-                text=True
+                text=True,
+                check=False,
             )
             print("📊 Container Status:")
             print(result.stdout)
@@ -261,51 +283,22 @@ Examples:
 
   # Stop and cleanup
   python run_server_podman.py --cleanup
-        """
+        """,
     )
 
     parser.add_argument(
         "--transport",
         choices=["stdio", "http", "sse", "auto"],
         default="http",
-        help="Transport mode (default: http)"
+        help="Transport mode (default: http)",
     )
-    parser.add_argument(
-        "--host",
-        default="0.0.0.0",
-        help="Server host (default: 0.0.0.0)"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Server port (default: 8000)"
-    )
-    parser.add_argument(
-        "--detached",
-        action="store_true",
-        help="Run in detached mode"
-    )
-    parser.add_argument(
-        "--build",
-        action="store_true",
-        help="Force rebuild Docker image"
-    )
-    parser.add_argument(
-        "--logs",
-        action="store_true",
-        help="Show container logs"
-    )
-    parser.add_argument(
-        "--status",
-        action="store_true",
-        help="Show container status"
-    )
-    parser.add_argument(
-        "--cleanup",
-        action="store_true",
-        help="Stop and remove container"
-    )
+    parser.add_argument("--host", default="0.0.0.0", help="Server host (default: 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8000, help="Server port (default: 8000)")
+    parser.add_argument("--detached", action="store_true", help="Run in detached mode")
+    parser.add_argument("--build", action="store_true", help="Force rebuild Docker image")
+    parser.add_argument("--logs", action="store_true", help="Show container logs")
+    parser.add_argument("--status", action="store_true", help="Show container status")
+    parser.add_argument("--cleanup", action="store_true", help="Stop and remove container")
 
     args = parser.parse_args()
 
@@ -334,10 +327,7 @@ Examples:
 
     # Run the server
     success = runner.run_server(
-        transport=args.transport,
-        host=args.host,
-        port=args.port,
-        detached=args.detached
+        transport=args.transport, host=args.host, port=args.port, detached=args.detached
     )
 
     if not success:

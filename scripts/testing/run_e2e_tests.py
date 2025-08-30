@@ -6,7 +6,6 @@ This script runs end-to-end tests with proper configuration and environment setu
 E2E tests validate complete workflows and real-world scenarios.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -22,8 +21,9 @@ from test_config import get_test_config
 test_config = get_test_config()
 
 
-def run_e2e_tests(verbose: bool = False, fail_fast: bool = False,
-                 subset: str = "all") -> tuple[int, str]:
+def run_e2e_tests(
+    verbose: bool = False, fail_fast: bool = False, subset: str = "all"
+) -> tuple[int, str]:
     """Run E2E tests and return exit code and output."""
     print("🌐 Running E2E Tests...")
 
@@ -36,13 +36,7 @@ def run_e2e_tests(verbose: bool = False, fail_fast: bool = False,
         return 1, error_msg
 
     # Build pytest command
-    cmd = [
-        "pytest",
-        "--tb=short",
-        "-v" if verbose else "-q",
-        "--asyncio-mode=auto",
-        "-m", "e2e"
-    ]
+    cmd = ["pytest", "--tb=short", "-v" if verbose else "-q", "--asyncio-mode=auto", "-m", "e2e"]
 
     if fail_fast:
         cmd.append("--maxfail=1")
@@ -65,7 +59,8 @@ def run_e2e_tests(verbose: bool = False, fail_fast: bool = False,
             env=env,
             capture_output=True,
             text=True,
-            timeout=test_config.get_timeout("e2e")
+            timeout=test_config.get_timeout("e2e"),
+            check=False,
         )
 
         return result.returncode, result.stdout + result.stderr
@@ -88,16 +83,14 @@ def main():
         "--subset",
         choices=["telegram", "mcp", "all"],
         default="all",
-        help="Run specific subset of E2E tests"
+        help="Run specific subset of E2E tests",
     )
 
     args = parser.parse_args()
 
     # Run tests
     exit_code, output = run_e2e_tests(
-        verbose=args.verbose,
-        fail_fast=args.fail_fast,
-        subset=args.subset
+        verbose=args.verbose, fail_fast=args.fail_fast, subset=args.subset
     )
 
     # Print output
