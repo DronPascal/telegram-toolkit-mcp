@@ -141,11 +141,14 @@ class TelegramMCPServer:
                 logger.error("Error during Telegram client shutdown", error=str(e))
 
     @asynccontextmanager
-    async def lifespan(self) -> AsyncGenerator[None, None]:
+    async def lifespan(self, app) -> AsyncGenerator[None, None]:
         """
         Lifespan context manager for MCP server.
 
         Handles startup and shutdown of the Telegram client and other resources.
+        
+        Args:
+            app: The FastAPI/ASGI application instance (required by FastMCP)
         """
         logger.info("Starting Telegram Toolkit MCP Server")
 
@@ -157,10 +160,6 @@ class TelegramMCPServer:
                 logger.info("OpenTelemetry tracing initialized successfully")
             else:
                 logger.info("OpenTelemetry tracing disabled or not available")
-
-            # Create MCP server if not exists
-            if not self.mcp_server:
-                self.create_mcp_server()
 
             await self.initialize_telegram_client()
             self.metrics_collector.update_active_connections(1)
@@ -336,23 +335,10 @@ class TelegramMCPServer:
             # Use streamable-http transport - check FastMCP version compatibility
             logger.info("🚀 Running FastMCP with streamable-http transport...")
 
-            # Try different approaches based on FastMCP version
-            try:
-                # Try with host/port parameters (newer versions)
-                self.mcp_server.run(
-                    transport="streamable-http",
-                    host=self.config.server.host,
-                    port=self.config.server.port,
-                )
-            except TypeError as e:
-                if "unexpected keyword argument" in str(e):
-                    logger.warning(
-                        "FastMCP version doesn't support host/port parameters, using manual ASGI server"
-                    )
-                    # Use manual ASGI server with proper host/port configuration
-                    self._run_manual_asgi_server()
-                else:
-                    raise e
+            # FastMCP 0.9.0 doesn't support host/port parameters in run()
+            # Use manual ASGI server approach for proper host/port configuration
+            logger.info("Using manual ASGI server for FastMCP 0.9.0 compatibility")
+            self._run_manual_asgi_server()
 
         except Exception as e:
             logger.error("Failed to start FastMCP server", error=str(e))
