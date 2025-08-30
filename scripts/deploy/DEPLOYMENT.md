@@ -2,6 +2,26 @@
 
 ## 📋 Overview
 
+### 🔧 Domain Configuration
+
+**Repository contains placeholder domains** for security and privacy:
+- `YOUR_DOMAIN_PLACEHOLDER` in `nginx.conf` - automatically replaced during deployment
+- `your-domain.com` in examples - replace with your actual domain
+- `admin@your-domain.com` in examples - replace with your actual email
+
+### 🚀 Quick Deployment
+
+```bash
+# Deploy with your domain
+./deploy.sh your-domain.com admin@your-domain.com
+
+# The script will automatically:
+# ✅ Replace YOUR_DOMAIN_PLACEHOLDER with your-domain.com
+# ✅ Configure Nginx with your domain
+# ✅ Set up SSL certificate
+# ✅ Start services
+```
+
 This guide covers deploying the Telegram Toolkit MCP server to a production VPS with Docker, Nginx reverse proxy, and SSL certificates. The deployment is designed to be secure, scalable, and easy to maintain.
 
 ## 🎯 Quick Start
@@ -116,7 +136,7 @@ docker compose up -d
 sudo cp nginx.conf /etc/nginx/sites-available/your-domain.com
 
 # Update domain name in config
-sudo sed -i 's/your-domain\.com/your-domain.com/g' /etc/nginx/sites-available/your-domain.com
+sudo sed -i 's/YOUR_DOMAIN_PLACEHOLDER/your-domain.com/g' /etc/nginx/sites-available/your-domain.com
 
 # Enable site
 sudo ln -s /etc/nginx/sites-available/your-domain.com /etc/nginx/sites-enabled/

@@ -97,7 +97,7 @@ if command -v nginx &> /dev/null; then
     sudo ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
 
     # Update nginx config with actual domain
-    sudo sed -i "s/your-domain.com/$DOMAIN_NAME/g" /etc/nginx/sites-available/$DOMAIN_NAME
+    sudo sed -i "s/YOUR_DOMAIN_PLACEHOLDER/$DOMAIN_NAME/g" /etc/nginx/sites-available/$DOMAIN_NAME
 
     # Test nginx configuration
     sudo nginx -t
