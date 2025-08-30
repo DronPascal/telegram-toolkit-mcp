@@ -27,15 +27,24 @@
 
 ## 📋 Table of Contents
 
+- [Scripts Directory](#scripts-directory)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [MCP Tools](#mcp-tools)
 - [API Reference](#api-reference)
+- [Remote MCP Usage](#remote-mcp-usage)
+- [Examples](#examples)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
+
+## 📁 Scripts Directory
+
+The `scripts/` directory contains utility scripts for testing, validation, deployment, and maintenance of the Telegram Toolkit MCP server.
+
+**📖 For detailed information about script organization, usage, and workflows, see: [`scripts/README.md`](scripts/README.md)**
 
 ## 🚀 Quick Start
 
@@ -334,73 +343,20 @@ Standardized error codes:
 
 ## 🛠️ Development
 
-### Setting up Development Environment
+## 🚀 Quick Development Setup
 
 ```bash
-# Clone repository
+# Clone and setup
 git clone https://github.com/DronPascal/telegram-toolkit-mcp.git
 cd telegram-toolkit-mcp
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
-
-# Install development dependencies
+# Create environment and install
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,observability]"
-
-# Set up pre-commit hooks
 pre-commit install
 
-# Run tests
-pytest
-```
-
-### Project Structure
-
-```
-telegram-toolkit-mcp/
-├── src/telegram_toolkit_mcp/
-│   ├── __init__.py
-│   ├── server.py              # FastMCP server
-│   ├── tools/                 # MCP tool implementations
-│   │   ├── resolve_chat.py
-│   │   └── fetch_history.py
-│   ├── models/                # Pydantic models
-│   │   ├── types.py
-│   │   └── schemas.py
-│   ├── core/                  # Business logic
-│   │   ├── telegram_client.py
-│   │   ├── pagination.py
-│   │   └── error_handler.py
-│   └── utils/                 # Utilities
-│       ├── logging.py
-│       └── security.py
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-├── docs/
-├── pyproject.toml
-├── .gitignore
-├── .cursorignore
-└── README.md
-```
-
-### Running Tests
-
-```bash
-# Unit tests
-pytest tests/unit/
-
-# Integration tests
-pytest tests/integration/
-
-# End-to-end tests (requires Telegram API)
-pytest tests/e2e/
-
-# All tests with coverage
-pytest --cov=telegram_toolkit_mcp
+# Run all tests (our 5-script testing system)
+python scripts/testing/run_all_tests.py --verbose
 ```
 
 ## 🤝 Contributing
@@ -880,6 +836,53 @@ mypy src/
 4. Ensure all tests pass
 5. Update documentation
 6. Submit pull request
+
+## 🌐 Remote MCP Usage
+
+For detailed instructions on how to use the MCP server from any programming language, see:
+
+📖 **[REMOTE_MCP_USAGE.md](REMOTE_MCP_USAGE.md)** - Complete guide for remote MCP integration
+
+This guide covers:
+- Language-agnostic HTTP communication
+- JSON-RPC 2.0 protocol usage
+- Examples in Python, JavaScript, Go, and cURL
+- Error handling and best practices
+- Pagination and advanced features
+
+## 💡 Examples
+
+### Simple CLI Client
+
+A ready-to-use command-line client is available in the `examples/` directory:
+
+```bash
+# Navigate to examples
+cd examples/simple-client
+
+# Configure your domain
+cp env.example .env
+# Edit .env with your MCP_DOMAIN
+
+# Install dependencies
+pip install requests python-dotenv
+
+# Use the client
+python simple_client.py health
+python simple_client.py tools
+python simple_client.py resolve "@telegram"
+python simple_client.py fetch "@telegram" --from "2025-01-01T00:00:00Z"
+python simple_client.py interactive
+```
+
+The client demonstrates:
+- Environment-based configuration
+- JSON-RPC 2.0 communication
+- Error handling and retry logic
+- Interactive exploration mode
+- Command-line interface patterns
+
+**See:** `examples/simple-client/README.md` for detailed usage instructions.
 
 ## 🙏 Acknowledgments
 

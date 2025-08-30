@@ -38,7 +38,7 @@ class ServerConfig(BaseModel):
     port: int = Field(default=8000, ge=1, le=65535, description="Server bind port")
     log_level: str = Field(default="INFO", description="Logging level")
 
-    model_config = {"frozen": True}
+    # Note: Not frozen to allow command-line overrides
 
 
 class PerformanceConfig(BaseModel):

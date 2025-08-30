@@ -38,15 +38,18 @@ Process:
     6. Test channel access and validate setup
     7. Provide success confirmation and next steps
 """
-import sys
-import os
+
 import asyncio
+import os
+import sys
+
 from dotenv import load_dotenv
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from telegram_toolkit_mcp.utils.config import get_config
+
 
 async def authorize_session():
     """Authorize Telegram session for E2E testing."""
@@ -78,9 +81,7 @@ async def authorize_session():
         session = StringSession()
 
     client = TelegramClient(
-        session=session,
-        api_id=config.telegram.api_id,
-        api_hash=config.telegram.api_hash
+        session=session, api_id=config.telegram.api_id, api_hash=config.telegram.api_hash
     )
 
     try:
@@ -99,22 +100,22 @@ async def authorize_session():
             session_string = client.session.save()
 
             # Update .env file
-            env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-            with open(env_path, 'r') as f:
+            env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+            with open(env_path) as f:
                 lines = f.readlines()
 
             # Replace or add TELEGRAM_STRING_SESSION
             session_found = False
             for i, line in enumerate(lines):
-                if line.startswith('TELEGRAM_STRING_SESSION='):
-                    lines[i] = f'TELEGRAM_STRING_SESSION={session_string}\n'
+                if line.startswith("TELEGRAM_STRING_SESSION="):
+                    lines[i] = f"TELEGRAM_STRING_SESSION={session_string}\n"
                     session_found = True
                     break
 
             if not session_found:
-                lines.append(f'TELEGRAM_STRING_SESSION={session_string}\n')
+                lines.append(f"TELEGRAM_STRING_SESSION={session_string}\n")
 
-            with open(env_path, 'w') as f:
+            with open(env_path, "w") as f:
                 f.writelines(lines)
 
             print("✅ Session string saved to .env file")
@@ -145,22 +146,22 @@ async def authorize_session():
                 session_string = client.session.save()
 
                 # Update .env file
-                env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-                with open(env_path, 'r') as f:
+                env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+                with open(env_path) as f:
                     lines = f.readlines()
 
                 # Replace or add TELEGRAM_STRING_SESSION
                 session_found = False
                 for i, line in enumerate(lines):
-                    if line.startswith('TELEGRAM_STRING_SESSION='):
-                        lines[i] = f'TELEGRAM_STRING_SESSION={session_string}\n'
+                    if line.startswith("TELEGRAM_STRING_SESSION="):
+                        lines[i] = f"TELEGRAM_STRING_SESSION={session_string}\n"
                         session_found = True
                         break
 
                 if not session_found:
-                    lines.append(f'TELEGRAM_STRING_SESSION={session_string}\n')
+                    lines.append(f"TELEGRAM_STRING_SESSION={session_string}\n")
 
-                with open(env_path, 'w') as f:
+                with open(env_path, "w") as f:
                     f.writelines(lines)
 
                 print("✅ Session string saved to .env file")
@@ -172,7 +173,7 @@ async def authorize_session():
                 # Test channel access
                 print("\n🔍 Testing channel access...")
                 try:
-                    entity = await client.get_entity('@telegram')
+                    entity = await client.get_entity("@telegram")
                     print(f"✅ @telegram channel accessible: {entity.title}")
                 except Exception as e:
                     print(f"⚠️  @telegram access failed: {e}")
@@ -193,8 +194,10 @@ async def authorize_session():
     except Exception as e:
         print(f"❌ Authorization error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     print("🚀 Telegram Session Authorization for E2E Testing")

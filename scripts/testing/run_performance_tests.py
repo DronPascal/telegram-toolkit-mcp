@@ -16,21 +16,85 @@ from pathlib import Path
 from typing import Any
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from telegram_toolkit_mcp.core.monitoring import get_metrics_collector
-from telegram_toolkit_mcp.core.performance import (
-    LoadTestConfig,
-    PerformanceMetrics,
-    PerformanceOptimizer,
-    benchmark_async,
-    get_performance_profiler,
-    run_load_test,
-    run_stress_test,
-)
-from telegram_toolkit_mcp.utils.logging import get_logger
+# Try to import performance dependencies with graceful degradation
+PERFORMANCE_DEPS_AVAILABLE = False
+try:
+    from telegram_toolkit_mcp.core.monitoring import get_metrics_collector
+    from telegram_toolkit_mcp.core.performance import (
+        LoadTestConfig,
+        PerformanceMetrics,
+        PerformanceOptimizer,
+        benchmark_async,
+        get_performance_profiler,
+        run_load_test,
+        run_stress_test,
+    )
+    from telegram_toolkit_mcp.utils.logging import get_logger
 
-logger = get_logger(__name__)
+    PERFORMANCE_DEPS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Performance testing dependencies not available: {e}")
+    print("💡 Install with: pip install prometheus-client psutil")
+    print(
+        "   Or use virtual environment: python3 -m venv venv && source venv/bin/activate && pip install prometheus-client psutil"
+    )
+    PERFORMANCE_DEPS_AVAILABLE = False
+
+    # Create mock types and logger for graceful degradation
+    class MockLogger:
+        def info(self, msg):
+            print(f"INFO: {msg}")
+
+        def error(self, msg):
+            print(f"ERROR: {msg}")
+
+        def warning(self, msg):
+            print(f"WARNING: {msg}")
+
+    # Mock performance types
+    class MockPerformanceMetrics:
+        def __init__(self):
+            self.execution_time = 0.0
+            self.memory_usage = 0
+            self.cpu_usage = 0.0
+
+    PerformanceMetrics = MockPerformanceMetrics
+
+    class MockLoadTestConfig:
+        def __init__(self, duration_seconds=30, concurrent_users=5):
+            self.duration_seconds = duration_seconds
+            self.concurrent_users = concurrent_users
+
+    LoadTestConfig = MockLoadTestConfig
+
+    # Mock other classes
+    class MockPerformanceOptimizer:
+        def set_baseline(self, name, metrics):
+            pass
+
+    PerformanceOptimizer = MockPerformanceOptimizer
+
+    class MockMetricsCollector:
+        def collect_metrics(self):
+            return {}
+
+    # Mock functions
+    async def benchmark_async(operation, iterations=50):
+        return MockPerformanceMetrics()
+
+    def get_performance_profiler():
+        return None
+
+    async def run_load_test(config, operations):
+        return [MockPerformanceMetrics()]
+
+    async def run_stress_test(operations, max_concurrency=20):
+        return [MockPerformanceMetrics()]
+
+else:
+    logger = get_logger(__name__)
 
 
 class PerformanceTestSuite:
@@ -38,12 +102,21 @@ class PerformanceTestSuite:
 
     def __init__(self):
         """Initialize the test suite."""
-        self.profiler = get_performance_profiler()
-        self.optimizer = PerformanceOptimizer()
-        self.metrics_collector = get_metrics_collector()
+        if PERFORMANCE_DEPS_AVAILABLE:
+            self.profiler = get_performance_profiler()
+            self.optimizer = PerformanceOptimizer()
+            self.metrics_collector = get_metrics_collector()
+        else:
+            self.profiler = None
+            self.optimizer = None
+            self.metrics_collector = None
 
     async def run_benchmark_tests(self) -> dict[str, PerformanceMetrics]:
         """Run benchmark tests for core operations."""
+        if not PERFORMANCE_DEPS_AVAILABLE:
+            logger.warning("Performance dependencies not available, skipping benchmark tests")
+            return {}
+
         logger.info("🧪 Running Benchmark Tests")
 
         results = {}
@@ -111,6 +184,10 @@ class PerformanceTestSuite:
 
     async def run_load_tests(self) -> dict[str, PerformanceMetrics]:
         """Run load tests for concurrent operations."""
+        if not PERFORMANCE_DEPS_AVAILABLE:
+            logger.warning("Performance dependencies not available, skipping load tests")
+            return {}
+
         logger.info("🧪 Running Load Tests")
 
         results = {}
@@ -167,6 +244,10 @@ class PerformanceTestSuite:
 
     async def run_stress_tests(self) -> list[PerformanceMetrics]:
         """Run stress tests with increasing concurrency."""
+        if not PERFORMANCE_DEPS_AVAILABLE:
+            logger.warning("Performance dependencies not available, skipping stress tests")
+            return []
+
         logger.info("🧪 Running Stress Tests")
 
         results = []
@@ -202,6 +283,10 @@ class PerformanceTestSuite:
 
     async def run_performance_analysis(self) -> dict[str, Any]:
         """Run comprehensive performance analysis."""
+        if not PERFORMANCE_DEPS_AVAILABLE:
+            logger.warning("Performance dependencies not available, skipping analysis")
+            return {"error": "Dependencies not available"}
+
         logger.info("🧪 Running Performance Analysis")
 
         # Run all tests
@@ -222,7 +307,7 @@ class PerformanceTestSuite:
         report = self.optimizer.generate_optimization_report(analyses)
 
         # Save results
-        results_dir = Path(__file__).parent.parent / "performance_results"
+        results_dir = Path(__file__).parent / "performance_results"
         results_dir.mkdir(exist_ok=True)
 
         timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -268,6 +353,20 @@ class PerformanceTestSuite:
 
 def main():
     """Main entry point for performance testing."""
+    if not PERFORMANCE_DEPS_AVAILABLE:
+        print("❌ Performance testing requires additional dependencies:")
+        print("   - prometheus-client")
+        print("   - psutil")
+        print()
+        print("💡 Install with:")
+        print("   pip install prometheus-client psutil")
+        print()
+        print("   Or use virtual environment:")
+        print(
+            "   python3 -m venv venv && source venv/bin/activate && pip install prometheus-client psutil"
+        )
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(
         description="Performance Testing Suite for Telegram Toolkit MCP"
     )

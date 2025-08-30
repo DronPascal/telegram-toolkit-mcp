@@ -590,6 +590,26 @@ mcp.run(transport="http", host="0.0.0.0", port=8000)
 # ✅ Streamable HTTP for large responses
 ```
 
+### From Monolithic Scripts to Modular Architecture
+```bash
+# OLD: Single script approach
+python scripts/run_all_tests.py  # Everything in one file
+
+# NEW: Modular architecture
+python scripts/testing/run_all_tests.py      # Master runner
+python scripts/testing/run_unit_tests.py     # Unit tests only
+python scripts/testing/run_integration_tests.py  # Integration only
+python scripts/testing/run_e2e_tests.py      # E2E only
+python scripts/testing/run_performance_tests.py  # Performance only
+
+# Benefits:
+# ✅ Separation of concerns
+# ✅ Easier maintenance
+# ✅ Selective test execution
+# ✅ Better error isolation
+# ✅ CI/CD flexibility
+```
+
 ### From Docker Compose v1 to v2
 ```bash
 # OLD: docker-compose (deprecated)

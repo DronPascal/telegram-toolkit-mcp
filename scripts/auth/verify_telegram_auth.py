@@ -6,7 +6,7 @@ This script verifies the current Telegram session authentication status.
 It checks if the user is properly authorized and can access Telegram API.
 
 Usage:
-    python3 scripts/verify_telegram_auth.py
+    python3 scripts/auth/verify_telegram_auth.py
 
 Features:
     - Verifies Telegram API credentials
@@ -23,16 +23,21 @@ Output:
     - User information (if authorized)
     - API connectivity confirmation
 """
+
 import asyncio
 import sys
-import os
+from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+# Add src to Python path
+src_path = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(src_path))
+# Imports moved to top
 
-from telegram_toolkit_mcp.utils.config import get_config
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+
+# Path already added above
+from telegram_toolkit_mcp.utils.config import get_config
 
 
 async def verify_telegram_auth():
@@ -54,59 +59,68 @@ async def verify_telegram_auth():
     try:
         # Load configuration
         config = get_config()
-        print(f'📋 API ID: {config.telegram.api_id}')
+        print(f"📋 API ID: {config.telegram.api_id}")
 
-        session_str = config.telegram.session_string[:20] + '...' if config.telegram.session_string else 'None'
-        print(f'🔑 Session: {session_str}')
+        session_str = (
+            config.telegram.session_string[:20] + "..."
+            if config.telegram.session_string
+            else "None"
+        )
+        print(f"🔑 Session: {session_str}")
 
         # Validate API credentials
         if not config.telegram.api_id or not config.telegram.api_hash:
-            print('❌ Missing API credentials')
-            print('   Please set TELEGRAM_API_ID and TELEGRAM_API_HASH in .env')
+            print("❌ Missing API credentials")
+            print("   Please set TELEGRAM_API_ID and TELEGRAM_API_HASH in .env")
             return False
 
         # Create and configure client
-        session = StringSession(config.telegram.session_string) if config.telegram.session_string else StringSession()
+        session = (
+            StringSession(config.telegram.session_string)
+            if config.telegram.session_string
+            else StringSession()
+        )
         client = TelegramClient(session, config.telegram.api_id, config.telegram.api_hash)
 
-        print('\n🔄 Connecting to Telegram...')
+        print("\n🔄 Connecting to Telegram...")
         await client.start()
 
         # Check authorization status
         if await client.is_user_authorized():
-            print('✅ User is authorized!')
+            print("✅ User is authorized!")
 
             # Get user information
             try:
                 me = await client.get_me()
                 if me:
-                    print('👤 User Information:')
+                    print("👤 User Information:")
                     print(f'   Name: {me.first_name} {me.last_name or ""}'.strip())
                     print(f'   Username: @{me.username or "not set"}')
-                    print(f'   User ID: {me.id}')
+                    print(f"   User ID: {me.id}")
                     print(f'   Phone: {me.phone or "not available"}')
 
                     # Test basic API functionality
-                    print('\n🔍 Testing API functionality...')
+                    print("\n🔍 Testing API functionality...")
                     dialogs = await client.get_dialogs(limit=1)
-                    print(f'✅ API access confirmed (found {len(dialogs)} dialogs)')
+                    print(f"✅ API access confirmed (found {len(dialogs)} dialogs)")
 
                     return True
                 else:
-                    print('⚠️  User info unavailable (get_me() returned None)')
+                    print("⚠️  User info unavailable (get_me() returned None)")
                     return False
 
             except Exception as e:
-                print(f'❌ Error retrieving user info: {e}')
+                print(f"❌ Error retrieving user info: {e}")
                 return False
         else:
-            print('❌ User is NOT authorized')
-            print('   Please run: python3 scripts/auth_telegram_session.py')
+            print("❌ User is NOT authorized")
+            print("   Please run: python3 scripts/auth_telegram_session.py")
             return False
 
     except Exception as e:
-        print(f'❌ Authentication verification failed: {e}')
+        print(f"❌ Authentication verification failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

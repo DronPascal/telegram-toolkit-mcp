@@ -37,21 +37,24 @@ Test Flow:
     5. Response validation and performance measurement
     6. Security auditing and cleanup
 """
-import sys
-import os
+
 import asyncio
 import json
+import os
+import sys
 import time
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+src_path = os.path.join(os.path.dirname(__file__), "..", "..", "src")
+sys.path.insert(0, src_path)
 
-from telegram_toolkit_mcp.core.telegram_client import TelegramClientWrapper
-from telegram_toolkit_mcp.utils.config import get_config
-from telegram_toolkit_mcp.utils.logging import get_logger
 from dotenv import load_dotenv
 
+from telegram_toolkit_mcp.utils.config import get_config
+from telegram_toolkit_mcp.utils.logging import get_logger
+
 logger = get_logger(__name__)
+
 
 async def test_resolve_chat():
     """
@@ -88,11 +91,13 @@ async def test_resolve_chat():
     from telethon import TelegramClient
     from telethon.sessions import StringSession
 
-    session = StringSession(config.telegram.session_string) if config.telegram.session_string else StringSession()
+    session = (
+        StringSession(config.telegram.session_string)
+        if config.telegram.session_string
+        else StringSession()
+    )
     telethon_client = TelegramClient(
-        session=session,
-        api_id=config.telegram.api_id,
-        api_hash=config.telegram.api_hash
+        session=session, api_id=config.telegram.api_id, api_hash=config.telegram.api_hash
     )
 
     await telethon_client.start()
@@ -106,6 +111,7 @@ async def test_resolve_chat():
 
         # Test input validation
         from telegram_toolkit_mcp.utils.security import InputValidator
+
         input_validator = InputValidator()
         sanitized = input_validator.sanitize_chat_identifier("@telegram")
         assert sanitized == "@telegram", f"Input sanitization failed: {sanitized}"
@@ -113,10 +119,11 @@ async def test_resolve_chat():
 
         # Test security audit
         from telegram_toolkit_mcp.utils.security import get_security_auditor
+
         security_auditor = get_security_auditor()
         security_auditor.log_security_event(
             event_type="chat_resolution_attempt",
-            details={"chat": "@telegram", "source": "e2e_test"}
+            details={"chat": "@telegram", "source": "e2e_test"},
         )
         print("✅ Security audit logged")
 
@@ -135,9 +142,9 @@ async def test_resolve_chat():
             entity = await client.get_entity("@telegram")
             chat_info = {
                 "id": entity.id,
-                "title": getattr(entity, 'title', 'Unknown'),
-                "kind": "channel" if hasattr(entity, 'broadcast') and entity.broadcast else "group",
-                "username": getattr(entity, 'username', None)
+                "title": getattr(entity, "title", "Unknown"),
+                "kind": "channel" if hasattr(entity, "broadcast") and entity.broadcast else "group",
+                "username": getattr(entity, "username", None),
             }
         except Exception as e:
             print(f"❌ Failed to resolve @telegram: {e}")
@@ -149,8 +156,12 @@ async def test_resolve_chat():
         assert chat_info is not None, "Chat info is None"
         assert "id" in chat_info, "Missing 'id' in chat info"
         assert "title" in chat_info, "Missing 'title' in chat info"
-        assert "telegram" in chat_info.get("title", "").lower(), f"Title doesn't contain 'telegram': {chat_info.get('title')}"
-        assert chat_info.get("kind") == "channel", f"Expected 'channel', got '{chat_info.get('kind')}'"
+        assert (
+            "telegram" in chat_info.get("title", "").lower()
+        ), f"Title doesn't contain 'telegram': {chat_info.get('title')}"
+        assert (
+            chat_info.get("kind") == "channel"
+        ), f"Expected 'channel', got '{chat_info.get('kind')}'"
 
         # Record success metrics (skip for now to focus on core functionality)
         print("✅ Metrics recording skipped for this test")
@@ -170,16 +181,19 @@ async def test_resolve_chat():
 
         # Record error metrics
         from telegram_toolkit_mcp.core.monitoring import get_metrics_collector
+
         metrics_collector = get_metrics_collector()
         metrics_collector.record_error("tg.resolve_chat", str(e))
 
         print(f"❌ E2E TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
     finally:
         await client.disconnect()
+
 
 if __name__ == "__main__":
     print("🚀 Telegram Toolkit MCP - E2E Chat Resolution Test")

@@ -1,230 +1,176 @@
 # Telegram Toolkit MCP - Scripts Directory
 
-This directory contains utility scripts for testing, validation, and maintenance of the Telegram Toolkit MCP server.
+This directory contains utility scripts for testing, validation, deployment, and maintenance of the Telegram Toolkit MCP server.
 
-## 📋 Available Scripts
+## 🏗️ New Unified Testing Architecture (2024)
 
-### 🧪 Testing & Validation
+**✨ MAJOR UPDATE**: We've introduced a unified testing system with centralized configuration and master test runner.
 
-#### `run_all_tests.py` ⭐ **NEW - MAIN TESTING SCRIPT**
-**Purpose**: Comprehensive test runner for all test suites
-- ✅ **Unit Tests**: 99%+ coverage validation
-- ✅ **Integration Tests**: 97% success rate (30/31 passed)
-- ✅ **E2E Tests**: 100% success rate (35/35 passed)
-- 📊 **Dependency Check**: Validates MCP, Telethon, httpx
-- 🎯 **Smart Execution**: Skips E2E if dependencies missing
-- 📋 **Detailed Reporting**: Comprehensive test results
+### Key Improvements:
+- 🎯 **Unified Interface**: Single entry point for all test types
+- 📊 **Centralized Reporting**: Consistent test results and metrics
+- ⚙️ **Configuration Management**: Shared settings across all test scripts
+- 🔄 **Backward Compatibility**: Legacy scripts still work with deprecation warnings
 
-**Usage**:
+## 📁 Directory Structure
+
+### `validation/` - Environment & Configuration Scripts
+- `validate_environment.py` - Validates environment variables and .env configuration
+- `test_api_connectivity.py` - Tests basic Telegram API connectivity and credentials
+- `test_resolve_chat_e2e.py` - E2E testing of chat resolution functionality
+
+### `auth/` - Authentication & Authorization Scripts
+- `auth_telegram_session.py` - Interactive Telegram session authorization
+- `verify_telegram_auth.py` - Verifies current Telegram session status
+
+### `testing/` - Test Execution Scripts
+- `run_all_tests.py` 🎯 **MASTER RUNNER** - Runs all test types in sequence
+- `run_unit_tests.py` - Unit tests (fast, isolated component tests)
+- `run_integration_tests.py` - Integration tests (component interactions)
+- `run_e2e_tests.py` - End-to-end tests (complete workflow validation)
+- `run_performance_tests.py` - Performance tests (benchmarking and load testing)
+- `test_config.py` ⚙️ **CONFIG MODULE** - Centralized test configuration
+
+### `deploy/` - Deployment Scripts
+- `deploy.sh` - Automated deployment script for VPS/Docker environments
+- `DEPLOYMENT.md` - Complete deployment guide and documentation
+
+## 🚀 Quick Start
+
 ```bash
-# Run all tests with dependency validation
-python3 scripts/run_all_tests.py
+# 1. Validate environment
+python3 scripts/validation/validate_environment.py
 
-# Quick test status check
-python3 scripts/run_all_tests.py | grep "OVERALL"
+# 2. Authorize Telegram session
+python3 scripts/auth/auth_telegram_session.py
+
+# 3. Run ALL tests (recommended)
+python3 scripts/testing/run_all_tests.py
+
+# 4. Run specific test types
+python3 scripts/testing/run_unit_tests.py         # Only unit tests
+python3 scripts/testing/run_integration_tests.py # Only integration tests
+python3 scripts/testing/run_e2e_tests.py          # Only E2E tests
+python3 scripts/testing/run_performance_tests.py --test-type benchmark
+
+# 5. Deploy to production
+./scripts/deploy/deploy.sh your-domain.com
 ```
 
-**Test Coverage**:
-- **Unit Tests**: Core business logic (99%+ coverage)
-- **Integration Tests**: Component integration (97% success)
-- **E2E Tests**: Full HTTP transport validation (100% success)
+## 📋 Master Test Runner
 
-**Features**:
-- Automatic dependency detection
-- Parallel test execution
-- Comprehensive error reporting
-- Production readiness validation
+The `run_all_tests.py` script provides a simple, sequential execution of all test types:
 
-### 🔧 Environment & Configuration
+### ✨ Features:
+- **Sequential Execution**: Runs Unit → Integration → E2E → Performance tests
+- **Unified Summary**: Single report with overall statistics
+- **Fail-Fast Support**: Stop on first failure option
+- **Minimal Logic**: Simple orchestration, detailed work in specialized scripts
+- **Consistent Interface**: Same CLI options across all test scripts
 
-#### `validate_environment.py`
-**Purpose**: Validate environment variables and configuration
-- ✅ Checks required Telegram API credentials
-- ✅ Validates .env file loading
-- ✅ Verifies configuration completeness
-- ✅ Provides actionable error messages
+### 🎯 Usage Examples:
 
-**Usage**:
 ```bash
-python3 scripts/validate_environment.py
+# Run ALL tests (recommended for CI/CD)
+python3 scripts/testing/run_all_tests.py
+
+# Verbose output with all details
+python3 scripts/testing/run_all_tests.py --verbose
+
+# Stop on first failure (fast feedback)
+python3 scripts/testing/run_all_tests.py --fail-fast
 ```
 
-**When to use**:
-- After initial setup
-- When configuration issues occur
-- Before running other scripts
+### 📊 Sample Output:
+```
+🚀 RUNNING ALL TESTS
+==================================================
 
-### 🔐 Authentication & Authorization
+📋 Running Unit Tests...
+✅ Unit Tests: PASSED
 
-#### `auth_telegram_session.py`
-**Purpose**: Interactive Telegram session authorization
-- 📱 Guides through phone number verification
-- 🔑 Generates and stores session string
-- 💾 Automatically updates .env file
-- 🧪 Tests channel access (@telegram)
+📋 Running Integration Tests...
+✅ Integration Tests: PASSED
 
-**Usage**:
-```bash
-python3 scripts/auth_telegram_session.py
+📋 Running E2E Tests...
+✅ E2E Tests: PASSED
+
+📋 Running Performance Tests...
+✅ Performance Tests: PASSED
+
+==================================================
+📊 FINAL SUMMARY
+==================================================
+📋 Total test suites run: 4
+✅ Passed: 4
+❌ Failed: 0
+📈 Success rate: 100.0%
+🎯 Overall: ALL PASSED
+
+🔚 Exit code: 0
 ```
 
-**Requirements**:
-- Valid TELEGRAM_API_ID and TELEGRAM_API_HASH
-- Active phone number registered with Telegram
-- Access to Telegram app for verification codes
+## 🔧 Configuration System
 
-#### `verify_telegram_auth.py`
-**Purpose**: Verify current Telegram session status
-- ✅ Checks user authorization status
-- 👤 Retrieves and displays user information
-- 🔍 Tests basic API functionality
-- 📊 Provides connectivity confirmation
+The new `test_config.py` provides centralized configuration:
 
-**Usage**:
+- **Timeouts**: Configurable timeouts for different test types
+- **Dependencies**: Centralized dependency checking
+- **Environment**: Required environment variables by test type
+- **Paths**: Standardized paths for test directories
+- **Pytest Settings**: Unified pytest configuration
+
+## 🎯 Categories Overview
+
+| Category | Purpose | Key Scripts | Status |
+|----------|---------|-------------|---------|
+| **Validation** | Configuration and connectivity validation | Environment setup, API testing | ✅ Active |
+| **Auth** | Telegram session management | Authorization, verification | ✅ Active |
+| **Testing** | Test execution and quality assurance | 5 specialized test runners | ✅ **MODULAR ARCHITECTURE** |
+| **Deploy** | Production deployment automation | Docker, Nginx, SSL setup | ✅ Active |
+
+## 🔧 Common Workflows
+
+### Development Setup
+1. Validate environment configuration
+2. Authorize Telegram session
+3. Run all tests: `python3 scripts/testing/run_all_tests.py`
+4. Check results and fix any issues
+5. Deploy to staging/production
+
+### CI/CD Integration
 ```bash
-python3 scripts/verify_telegram_auth.py
+# Full test suite (recommended)
+python3 scripts/testing/run_all_tests.py --verbose
+
+# Fast feedback (stop on first failure)
+python3 scripts/testing/run_all_tests.py --fail-fast
+
+# Individual test suites
+python3 scripts/testing/run_unit_tests.py
+python3 scripts/testing/run_integration_tests.py
+python3 scripts/testing/run_e2e_tests.py
 ```
 
-**When to use**:
-- After session authorization
-- When connectivity issues occur
-- Before running E2E tests
+## 📞 Support & Documentation
 
-### 🧪 Testing Scripts
+### Test Scripts:
+- **Master Runner**: `python3 scripts/testing/run_all_tests.py --help`
+- **Unit Tests**: `python3 scripts/testing/run_unit_tests.py --help`
+- **Integration Tests**: `python3 scripts/testing/run_integration_tests.py --help`
+- **E2E Tests**: `python3 scripts/testing/run_e2e_tests.py --help`
+- **Performance Tests**: `python3 scripts/testing/run_performance_tests.py --help`
 
-#### `test_api_connectivity.py`
-**Purpose**: Test basic Telegram API connectivity
-- 🌐 Validates API credentials
-- 📡 Tests network connectivity
-- ⚡ Measures connection latency
-- 🔍 Basic API response validation
+### Configuration:
+- **Test Config**: Check `test_config.py` for centralized settings
+- **Environment Setup**: See `scripts/validation/validate_environment.py`
+- **Dependencies**: All test scripts use shared dependency checking
 
-**Usage**:
-```bash
-python3 scripts/test_api_connectivity.py
-```
+### General:
+- **Individual Scripts**: Each script has comprehensive docstrings
+- **Deployment**: Refer to `DEPLOYMENT.md` for production setup
+- **Troubleshooting**: Run any script with `--help` flag for options
 
-**Note**: Doesn't require user authorization
+---
 
-#### `test_resolve_chat_e2e.py`
-**Purpose**: Comprehensive E2E testing of chat resolution
-- 🧪 Real Telegram API testing
-- 📊 Performance measurement
-- ✅ Channel resolution validation (@telegram)
-- 🔒 Security auditing integration
-
-**Usage**:
-```bash
-python3 scripts/test_resolve_chat_e2e.py
-```
-
-**Requirements**:
-- Authorized Telegram session
-- Internet connection
-- Valid API credentials
-
-### 🚀 Performance & Load Testing
-
-#### `run_performance_tests.py`
-**Purpose**: Execute comprehensive performance testing
-- 📈 Benchmark individual components
-- 🔄 Load testing with configurable parameters
-- 📊 Performance baseline establishment
-- 📋 Detailed reporting and analysis
-
-**Usage**:
-```bash
-python3 scripts/run_performance_tests.py
-```
-
-#### `run_e2e_tests.py`
-**Purpose**: Run complete E2E test suite
-- 🧪 Execute all E2E test cases
-- 📊 Generate comprehensive reports
-- 🔍 Validate end-to-end functionality
-- 📈 Performance and reliability metrics
-
-**Usage**:
-```bash
-python3 scripts/run_e2e_tests.py
-```
-
-## 🎯 Quick Start Guide
-
-### 1. Initial Setup
-```bash
-# 1. Validate environment configuration
-python3 scripts/validate_environment.py
-
-# 2. Authorize Telegram session (if not already done)
-python3 scripts/auth_telegram_session.py
-
-# 3. Verify authorization
-python3 scripts/verify_telegram_auth.py
-```
-
-### 2. Basic Testing
-```bash
-# Test API connectivity (no auth required)
-python3 scripts/test_api_connectivity.py
-
-# Run full E2E chat resolution test
-python3 scripts/test_resolve_chat_e2e.py
-```
-
-### 3. Performance Validation
-```bash
-# Run performance benchmarks
-python3 scripts/run_performance_tests.py
-
-# Run complete E2E test suite
-python3 scripts/run_e2e_tests.py
-```
-
-## 📁 Script Categories
-
-| Category | Scripts | Purpose |
-|----------|---------|---------|
-| **Setup** | `validate_environment.py` | Configuration validation |
-| **Auth** | `auth_telegram_session.py`<br>`verify_telegram_auth.py` | Session management |
-| **Testing** | `test_api_connectivity.py`<br>`test_resolve_chat_e2e.py` | Functionality validation |
-| **Performance** | `run_performance_tests.py`<br>`run_e2e_tests.py` | Performance analysis |
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### ❌ "Missing API credentials"
-**Solution**: Run `python3 scripts/validate_environment.py` to check configuration
-
-#### ❌ "User not authorized"
-**Solution**: Run `python3 scripts/auth_telegram_session.py` to authorize session
-
-#### ❌ "Connection timeout"
-**Solution**:
-- Check internet connection
-- Verify API credentials
-- Try again later (Telegram API rate limits)
-
-#### ❌ "Session expired"
-**Solution**: Re-run `python3 scripts/auth_telegram_session.py`
-
-## 📞 Support
-
-If you encounter issues with any script:
-
-1. Check the script's documentation header
-2. Run `python3 scripts/validate_environment.py` first
-3. Verify authorization with `python3 scripts/verify_telegram_auth.py`
-4. Check the error messages for specific guidance
-
-## 🚀 Next Steps
-
-After successful script execution:
-
-1. ✅ **E2E Testing**: Scripts validated real Telegram API functionality
-2. 🎯 **Performance Testing**: Ready for comprehensive benchmarking
-3. 🏗️ **Production Deployment**: Infrastructure tested and validated
-4. 📊 **Monitoring**: Scripts provide detailed logging and metrics
-
-**The Telegram Toolkit MCP is now fully validated and ready for production use!** 🎉
+**🎯 Perfect separation of concerns: 5 specialized scripts with minimal master runner!**

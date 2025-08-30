@@ -26,7 +26,10 @@ Output:
     - Configuration completeness check
     - Actionable error messages
 """
+
 import os
+import sys
+
 from dotenv import load_dotenv
 
 
@@ -50,90 +53,90 @@ def validate_environment():
 
     # Check environment before .env loading
     print("📋 Checking system environment (before .env):")
-    api_id_before = os.getenv('TELEGRAM_API_ID', 'NOT SET')
-    api_hash_before = os.getenv('TELEGRAM_API_HASH', 'NOT SET')
-    session_before = os.getenv('TELEGRAM_STRING_SESSION', 'NOT SET')
+    api_id_before = os.getenv("TELEGRAM_API_ID", "NOT SET")
+    api_hash_before = os.getenv("TELEGRAM_API_HASH", "NOT SET")
+    session_before = os.getenv("TELEGRAM_STRING_SESSION", "NOT SET")
 
-    print(f'   TELEGRAM_API_ID: {api_id_before}')
+    print(f"   TELEGRAM_API_ID: {api_id_before}")
     print(f'   TELEGRAM_API_HASH: {"*" * 8 if api_hash_before != "NOT SET" else "NOT SET"}')
     print(f'   TELEGRAM_STRING_SESSION: {"SET" if session_before != "NOT SET" else "NOT SET"}')
 
     # Try to load .env file
-    print('\n🔄 Loading .env file...')
+    print("\n🔄 Loading .env file...")
     try:
         load_dotenv()
-        print('✅ .env file loaded successfully')
+        print("✅ .env file loaded successfully")
     except Exception as e:
-        print(f'❌ Error loading .env file: {e}')
+        print(f"❌ Error loading .env file: {e}")
         return False
 
     # Check environment after .env loading
-    print('\n📋 Checking environment (after .env loading):')
-    api_id_after = os.getenv('TELEGRAM_API_ID', 'NOT SET')
-    api_hash_after = os.getenv('TELEGRAM_API_HASH', 'NOT SET')
-    session_after = os.getenv('TELEGRAM_STRING_SESSION', 'NOT SET')
+    print("\n📋 Checking environment (after .env loading):")
+    api_id_after = os.getenv("TELEGRAM_API_ID", "NOT SET")
+    api_hash_after = os.getenv("TELEGRAM_API_HASH", "NOT SET")
+    session_after = os.getenv("TELEGRAM_STRING_SESSION", "NOT SET")
 
-    print(f'   TELEGRAM_API_ID: {api_id_after}')
+    print(f"   TELEGRAM_API_ID: {api_id_after}")
     print(f'   TELEGRAM_API_HASH: {"*" * 8 if api_hash_after != "NOT SET" else "NOT SET"}')
     print(f'   TELEGRAM_STRING_SESSION: {"SET" if session_after != "NOT SET" else "NOT SET"}')
 
     # Validate required credentials
-    print('\n🔍 Validating required credentials...')
+    print("\n🔍 Validating required credentials...")
 
-    if api_id_after == 'NOT SET':
-        print('❌ TELEGRAM_API_ID is not set')
-        print('   Get it from: https://my.telegram.org/auth')
+    if api_id_after == "NOT SET":
+        print("❌ TELEGRAM_API_ID is not set")
+        print("   Get it from: https://my.telegram.org/auth")
         success = False
 
-    if api_hash_after == 'NOT SET':
-        print('❌ TELEGRAM_API_HASH is not set')
-        print('   Get it from: https://my.telegram.org/auth')
+    if api_hash_after == "NOT SET":
+        print("❌ TELEGRAM_API_HASH is not set")
+        print("   Get it from: https://my.telegram.org/auth")
         success = False
 
     # Check .env file content
-    print('\n📄 Checking .env file content...')
+    print("\n📄 Checking .env file content...")
     try:
-        with open('.env', 'r') as f:
+        with open(".env") as f:
             lines = f.readlines()
 
         telegram_vars = []
         for line in lines:
             line = line.strip()
-            if line.startswith('TELEGRAM_') and not line.startswith('#'):
+            if line.startswith("TELEGRAM_") and not line.startswith("#"):
                 telegram_vars.append(line)
 
         if telegram_vars:
-            print('✅ Found Telegram configuration in .env:')
+            print("✅ Found Telegram configuration in .env:")
             for var in telegram_vars:
-                if 'HASH' in var:
+                if "HASH" in var:
                     # Hide hash for security
-                    key, value = var.split('=', 1)
-                    print(f'   {key}=********')
+                    key, value = var.split("=", 1)
+                    print(f"   {key}=********")
                 else:
-                    print(f'   {var}')
+                    print(f"   {var}")
         else:
-            print('⚠️  No Telegram variables found in .env file')
+            print("⚠️  No Telegram variables found in .env file")
             success = False
 
     except FileNotFoundError:
-        print('❌ .env file not found')
-        print('   Please create .env file in project root')
+        print("❌ .env file not found")
+        print("   Please create .env file in project root")
         success = False
     except Exception as e:
-        print(f'❌ Error reading .env file: {e}')
+        print(f"❌ Error reading .env file: {e}")
         success = False
 
     # Check optional configuration
-    print('\n📋 Checking optional configuration...')
+    print("\n📋 Checking optional configuration...")
     optional_vars = [
-        ('MCP_SERVER_HOST', os.getenv('MCP_SERVER_HOST', 'localhost')),
-        ('MCP_SERVER_PORT', os.getenv('MCP_SERVER_PORT', '8000')),
-        ('DEBUG', os.getenv('DEBUG', 'false')),
+        ("MCP_SERVER_HOST", os.getenv("MCP_SERVER_HOST", "localhost")),
+        ("MCP_SERVER_PORT", os.getenv("MCP_SERVER_PORT", "8000")),
+        ("DEBUG", os.getenv("DEBUG", "false")),
     ]
 
     for name, value in optional_vars:
-        status = '✅' if value != 'NOT SET' else '❌'
-        print(f'   {status} {name}: {value}')
+        status = "✅" if value != "NOT SET" else "❌"
+        print(f"   {status} {name}: {value}")
 
     return success
 
@@ -156,4 +159,4 @@ if __name__ == "__main__":
         print("❌ ENVIRONMENT VALIDATION FAILED!")
         print("🔧 Please fix the configuration issues above")
 
-    exit(0 if success else 1)
+    sys.exit(0 if success else 1)
