@@ -20,11 +20,30 @@ docker-compose up -d
 
 ## Step 2: Verify Deployment
 
-```bash
-# Install verification dependencies
-pip3 install httpx
+### Option 1: Simple Check (No Dependencies Required)
 
-# Run verification script
+```bash
+# Download and run simple verification script
+python3 scripts/validation/simple_vps_check.py https://your-domain.com
+```
+
+### Option 2: Full Verification (Requires httpx)
+
+```bash
+# Install dependencies (choose one option):
+
+# Option A: System package (recommended)
+sudo apt update && sudo apt install python3-httpx
+
+# Option B: Virtual environment
+python3 -m venv ~/mcp_verifier
+~/mcp_verifier/bin/pip install httpx
+alias python3="~/mcp_verifier/bin/python3"
+
+# Option C: pipx (if available)
+sudo apt install pipx && pipx install httpx
+
+# Run full verification
 python3 scripts/validation/verify_vps_deployment.py https://your-domain.com
 ```
 

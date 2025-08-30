@@ -8,6 +8,20 @@ It checks all critical components: health endpoints, MCP protocol, session manag
 Usage:
     python3 verify_vps_deployment.py https://your-domain.com
     python3 verify_vps_deployment.py http://localhost:8000  # for local testing
+
+Installation on VPS:
+    Option 1 - System package:
+        sudo apt update && sudo apt install python3-httpx
+
+    Option 2 - Virtual environment:
+        python3 -m venv ~/mcp_verifier
+        ~/mcp_verifier/bin/pip install httpx
+        ~/mcp_verifier/bin/python3 verify_vps_deployment.py
+
+    Option 3 - pipx:
+        sudo apt install pipx
+        pipx install httpx
+        pipx run httpx --help
 """
 
 import asyncio
@@ -20,7 +34,12 @@ from urllib.parse import urlparse
 try:
     import httpx
 except ImportError:
-    print("❌ Error: httpx not installed. Run: pip install httpx")
+    print("❌ Error: httpx not installed.")
+    print("\n🔧 Installation options:")
+    print("1. System package: sudo apt update && sudo apt install python3-httpx")
+    print("2. Virtual env: python3 -m venv ~/mcp_verifier && ~/mcp_verifier/bin/pip install httpx")
+    print("3. pipx: sudo apt install pipx && pipx install httpx")
+    print("\nAfter installation, run the script again.")
     sys.exit(1)
 
 
