@@ -100,7 +100,7 @@ async def authorize_session():
             session_string = client.session.save()
 
             # Update .env file
-            env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+            env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
             with open(env_path) as f:
                 lines = f.readlines()
 
@@ -146,7 +146,7 @@ async def authorize_session():
                 session_string = client.session.save()
 
                 # Update .env file
-                env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+                env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
                 with open(env_path) as f:
                     lines = f.readlines()
 

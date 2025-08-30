@@ -31,12 +31,9 @@ from pathlib import Path
 # Add src to Python path
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
-# Imports moved to top
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-
-# Path already added above
 from telegram_toolkit_mcp.utils.config import get_config
 
 

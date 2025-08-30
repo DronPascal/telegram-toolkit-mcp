@@ -591,11 +591,22 @@ async def run_load_test(
 async def run_stress_test(
     operation: Callable,
     max_concurrent: int = 100,
-    config: Optional[LoadTestConfig] = None
+    config: Optional[LoadTestConfig] = None,
+    step_size: int = 5
 ) -> List[PerformanceMetrics]:
-    """Run stress test with default configuration."""
+    """Run stress test with default configuration.
+
+    Args:
+        operation: Async callable to test
+        max_concurrent: Maximum number of concurrent operations
+        config: Load test configuration (optional)
+        step_size: Step size for increasing concurrent users (default: 5)
+
+    Returns:
+        List of performance metrics for each concurrency level
+    """
     if config is None:
         config = LoadTestConfig(duration_seconds=30, ramp_up_seconds=5)
 
     tester = LoadTester(config)
-    return await tester.run_stress_test(operation, max_concurrent)
+    return await tester.run_stress_test(operation, max_concurrent, step_size)
