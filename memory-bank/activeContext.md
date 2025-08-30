@@ -1,21 +1,21 @@
 # Active Context: Telegram Toolkit MCP Development
 
 ## Current Status
-**Phase**: Production Live & Operational - Enterprise Infrastructure Complete
+**Phase**: Critical Server Fixes Applied - Production Deployment Ready
 **Date**: August 2025
-**Status**: ✅ FULLY OPERATIONAL - Live Production System with Enterprise Testing
-**Progress**: 20/20 core tasks + 5-script testing architecture + production deployment (100%)
-**Next Milestone**: User Adoption, Feature Expansion & Community Building
+**Status**: 🔧 CRITICAL FIXES COMPLETED - Server TypeError Issues Resolved
+**Progress**: 20/20 core tasks + critical server fixes + production deployment ready (100%)
+**Next Milestone**: VPS Deployment with Fixed Server & Full MCP Protocol Validation
 
 ## Immediate Next Steps
 
-### Priority 1: Production Operations ✅ COMPLETED
-- [x] VPS deployment with Docker + Nginx + SSL
-- [x] Domain configuration (your-domain.com)
-- [x] SSL certificate setup with Let's Encrypt
-- [x] Production health checks and monitoring
-- [x] Live endpoint validation
-- [x] Security hardening in production environment
+### Priority 1: Critical Server Fixes ✅ COMPLETED
+- [x] FastMCP lifespan context manager fixed (app parameter added)
+- [x] FastMCP.run() method fixed (removed unsupported host/port parameters)
+- [x] Manual ASGI server approach implemented for FastMCP 0.9.0 compatibility
+- [x] Server TypeError crashes resolved (session stability restored)
+- [x] Local testing validation completed (server starts and runs properly)
+- [x] Production deployment ready (fixes committed and ready for VPS)
 
 ### Priority 2: User Adoption & Integration
 - [x] MCP client integration documentation (README.md updated)
@@ -51,21 +51,21 @@
 - [x] Monitoring and alerting setup (Prometheus + health checks)
 - [x] Documentation and user guides completion
 
-## 🧪 Testing Infrastructure - ENTERPRISE GRADE
+## 🔧 Critical Server Fixes Applied
 
-### ✅ 5-Script Testing Architecture
-**🎯 Master Runner**: `run_all_tests.py` - Orchestrates all test types
-**🧪 Unit Tests**: `run_unit_tests.py` - Isolated component testing
-**🔗 Integration Tests**: `run_integration_tests.py` - Component interaction validation
-**🌐 E2E Tests**: `run_e2e_tests.py` - Complete workflow validation
-**⚡ Performance Tests**: `run_performance_tests.py` - Benchmarking & load testing
+### ✅ FastMCP Server Issues Resolved
+**🚨 TypeError Issues Fixed**: Critical server crashes resolved
+**🔧 Lifespan Context Manager**: Fixed to accept app parameter (FastMCP requirement)
+**⚙️ FastMCP.run() Method**: Removed unsupported host/port parameters
+**🖥️ Manual ASGI Server**: Implemented for FastMCP 0.9.0 compatibility
+**✅ Session Stability**: MCP sessions now create and maintain properly
 
-### 📊 Testing Results
-- **Unit Tests**: 101/101 passing (100% success rate)
-- **Integration Tests**: 30/30 passing (100% success rate)
-- **E2E Tests**: 35/35 passing (100% success rate)
-- **Performance Tests**: Working with venv support
-- **Overall**: 165/165 tests passing (100% success rate)
+### 📊 Fix Validation Results
+- **Local Server Testing**: ✅ Server starts without TypeError crashes
+- **Health Endpoint**: ✅ Returns proper JSON response
+- **MCP Initialize**: ✅ Creates sessions with proper session IDs
+- **Session Management**: ✅ Sessions persist and handle requests
+- **Production Ready**: ✅ Fixes committed and ready for VPS deployment
 
 ### 🔧 Testing Features
 - **Virtual Environment Support**: Proper venv integration
@@ -74,29 +74,33 @@
 - **Comprehensive Reporting**: Detailed success/failure reporting
 - **CI/CD Ready**: Automated execution for continuous integration
 
-## Production Infrastructure - LIVE
+## Production Infrastructure - DEPLOYMENT PENDING
 
 ### VPS Deployment Status
-**✅ Server**: Ubuntu VPS with Docker stack
-**✅ Domain**: your-domain.com (active)
+**🔧 Server**: Ubuntu VPS with Docker stack (needs server update)
+**✅ Domain**: tgtoolkit.azazazaza.work (active)
 **✅ SSL**: Let's Encrypt certificate (valid until Nov 27, 2025)
 **✅ Nginx**: Reverse proxy with streamable HTTP
-**✅ Docker**: FastMCP container healthy and operational
+**⚠️ Docker**: FastMCP container needs rebuild with fixes
 
-### Live Endpoints
-- **Health**: `https://your-domain.com/health` ✅
-- **Metrics**: `https://your-domain.com/metrics` ✅
-- **MCP API**: `https://your-domain.com/mcp` ✅
-- **Tools API**: `https://your-domain.com/api/tools` ✅
-- **Direct**: `http://localhost:8000/*` ✅
+### Deployment Commands Ready
+```bash
+# VPS deployment commands for fixed server:
+ssh telegram-mcp@weaselcloud-21551
+cd /opt/telegram-toolkit-mcp
+git pull origin main
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
 
-### System Health
-**🟢 All Systems Operational**
-- Container status: Healthy
+### System Health After Fixes
+**🟡 Deployment Required**
+- Container status: Needs rebuild with fixes
 - SSL certificate: Valid
 - Domain resolution: Working
-- API responses: 200 OK
-- MCP protocol: Functional
+- API responses: Health endpoint working
+- MCP protocol: Will be functional after deployment
 
 ## Current Architecture Decisions
 
@@ -129,10 +133,10 @@
 6. **Data Processing**: Server-side filtering and deduplication (implemented)
 
 ### 🔄 Open Questions & Next Steps
-1. **FLOOD_WAIT Integration**: How to integrate retry decorator with existing tools?
-2. **Search Optimization**: Should search be client-side or server-side filtering?
-3. **Resource Streaming**: How to implement true streaming for very large datasets?
-4. **Caching Strategy**: Should we cache frequently accessed chat info?
+1. **VPS Deployment**: Deploy fixed server to production VPS
+2. **MCP Protocol Validation**: Verify complete MCP flow after deployment
+3. **Session Management Testing**: Validate session stability in production
+4. **Performance Monitoring**: Monitor server performance after fixes
 
 ## Risk Assessment
 
