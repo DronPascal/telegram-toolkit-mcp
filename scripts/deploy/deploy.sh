@@ -18,6 +18,9 @@ DEPLOY_PATH="/opt/telegram-toolkit-mcp"
 
 echo -e "${BLUE}🚀 Telegram Toolkit MCP Deployment Script${NC}"
 echo -e "${BLUE}===========================================${NC}"
+echo -e "${BLUE}Domain: $DOMAIN_NAME${NC}"
+echo -e "${BLUE}Email: $EMAIL${NC}"
+echo ""
 
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
@@ -97,7 +100,16 @@ if command -v nginx &> /dev/null; then
     sudo ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
 
     # Update nginx config with actual domain
+    echo -e "${YELLOW}🔧 Replacing YOUR_DOMAIN_PLACEHOLDER with $DOMAIN_NAME...${NC}"
     sudo sed -i "s/YOUR_DOMAIN_PLACEHOLDER/$DOMAIN_NAME/g" /etc/nginx/sites-available/$DOMAIN_NAME
+
+    # Verify replacement worked
+    if sudo grep -q "$DOMAIN_NAME" /etc/nginx/sites-available/$DOMAIN_NAME; then
+        echo -e "${GREEN}✅ Domain replacement successful${NC}"
+    else
+        echo -e "${RED}❌ Domain replacement failed${NC}"
+        exit 1
+    fi
 
     # Test nginx configuration
     sudo nginx -t
