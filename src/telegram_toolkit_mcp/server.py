@@ -283,6 +283,24 @@ class TelegramMCPServer:
                 logger.error(f"❌ Metrics collection error: {e}")
                 return PlainTextResponse("Metrics collection failed", status_code=500)
 
+        # MCP test endpoint (non-SSE version for compatibility)
+        @self.mcp_server.custom_route("/mcp/test", methods=["GET"])
+        async def mcp_test_endpoint(request):
+            """Simple MCP test endpoint without SSE for compatibility."""
+            logger.info("🧪 MCP test endpoint requested")
+            from starlette.responses import JSONResponse
+            from datetime import datetime, timezone
+
+            return JSONResponse(
+                {
+                    "status": "ok",
+                    "message": "MCP server is running",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "endpoints": {"mcp": "/mcp (SSE)", "health": "/health", "metrics": "/metrics"},
+                    "note": "Use /mcp endpoint for full MCP protocol with SSE support",
+                }
+            )
+
         # Simple tools API route
         @self.mcp_server.custom_route("/api/tools", methods=["GET", "POST"])
         async def simple_tools_api(request):
