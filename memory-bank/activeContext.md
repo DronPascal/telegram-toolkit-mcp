@@ -78,15 +78,15 @@
 
 ### VPS Deployment Status
 **🔧 Server**: Ubuntu VPS with Docker stack (needs server update)
-**✅ Domain**: tgtoolkit.azazazaza.work (active)
-**✅ SSL**: Let's Encrypt certificate (valid until Nov 27, 2025)
+**✅ Domain**: your-domain.com (configured with placeholder system)
+**✅ SSL**: Let's Encrypt certificate with auto-renewal
 **✅ Nginx**: Reverse proxy with streamable HTTP
 **⚠️ Docker**: FastMCP container needs rebuild with fixes
 
 ### Deployment Commands Ready
 ```bash
 # VPS deployment commands for fixed server:
-ssh telegram-mcp@weaselcloud-21551
+ssh user@your-vps
 cd /opt/telegram-toolkit-mcp
 git pull origin main
 docker-compose down
