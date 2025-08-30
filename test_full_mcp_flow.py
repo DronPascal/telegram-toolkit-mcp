@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 """
+Full MCP Protocol Flow Test
+
+This script tests the complete MCP protocol flow including:
+- Health check
+- MCP initialization
+- Session management
+- Tool calls with proper session ID
+- Resource streaming
+"""
+
+"""
 Test script for complete MCP protocol flow with real tools.
 Tests the actual FastMCP server with real Telegram tools.
 """

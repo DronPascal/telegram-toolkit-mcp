@@ -18,6 +18,8 @@ except ImportError:
     FastMCP = None
     PlainTextResponse = None
 
+from datetime import UTC
+
 from .core.monitoring import init_metrics
 from .core.tracing import init_tracing, shutdown_tracing
 from .utils.config import get_config, validate_telegram_credentials
@@ -254,7 +256,18 @@ class TelegramMCPServer:
         async def health_endpoint(request):
             """Health check endpoint for load balancers and monitoring."""
             logger.info("🏥 Health check requested")
-            return PlainTextResponse("OK", status_code=200)
+            from datetime import datetime
+
+            from starlette.responses import JSONResponse
+
+            return JSONResponse(
+                {
+                    "status": "healthy",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "service": "telegram-toolkit-mcp",
+                    "version": "1.0.0",
+                }
+            )
 
         # Metrics route
         @self.mcp_server.custom_route("/metrics", methods=["GET"])
