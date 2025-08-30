@@ -146,7 +146,7 @@ class TelegramMCPServer:
         Lifespan context manager for MCP server.
 
         Handles startup and shutdown of the Telegram client and other resources.
-        
+
         Args:
             app: The FastAPI/ASGI application instance (required by FastMCP)
         """
